@@ -30,7 +30,7 @@
 
 ## 1. ติดตั้งลงบอร์ด
 
-### แบบที่ 1: ผ่านเว็บเบราว์เซอร์ (แนะนำสำหรับลูกค้า)
+### แบบที่ 1: ผ่านเว็บเบราว์เซอร์ (แนะนำ)
 
 ใช้ Chrome หรือ Edge บนคอมพิวเตอร์
 
@@ -454,7 +454,7 @@ python -X utf8 tools/http_test.py http://192.168.4.1
 python tools/make_release.py
 ```
 
-ได้ `docs/esp32-livecode-<ver>.bin`, `manifest.json`, `index.html` (GitHub Pages เสิร์ฟโฟลเดอร์ `docs/`) หรือนำไปวางบนเว็บที่เป็น https (เช่น GitHub Pages) ให้ลูกค้าติดตั้งผ่านเบราว์เซอร์
+ได้ `docs/esp32-livecode-<ver>.bin`, `manifest.json`, `index.html` (GitHub Pages เสิร์ฟโฟลเดอร์ `docs/`) หรือนำไปวางบนเว็บที่เป็น https (เช่น GitHub Pages) ให้ติดตั้งผ่านเบราว์เซอร์ได้
 
 ### Web API
 
