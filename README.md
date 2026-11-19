@@ -5,6 +5,20 @@
 > **Install in your browser (Chrome/Edge): https://tomored88.github.io/esp32-livecode/** — then connect to the Wi-Fi `ESP32-LiveCode` (default password `12345678`, change it in `src/config.h`) and open `http://192.168.4.1`.
 > License: MIT. Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+## ภาพหน้าจอ / Screenshots
+
+| บล็อก (Blockly) | โค้ด Lua |
+|---|---|
+| ![blocks](docs/img/blocks.png) | ![code](docs/img/code.png) |
+
+| ตัวอย่างโปรแกรม 53 แบบ | แผนผังขา ESP32 |
+|---|---|
+| ![examples](docs/img/examples.png) | ![pinout](docs/img/pinout.png) |
+
+| หน้าติดตั้งผ่านเบราว์เซอร์ |
+|---|
+| ![installer](docs/img/installer.png) |
+
 แฟลชเฟิร์มแวร์ลง ESP32 ครั้งเดียว จากนั้นเปิดเว็บที่บอร์ดเสิร์ฟเอง ลากบล็อก (หรือพิมพ์โค้ด Lua) แล้วกด **▶ รัน** โปรแกรมทำงานบนบอร์ดทันที ไม่ต้องคอมไพล์หรือแฟลชใหม่ ใช้งานได้แม้ไม่มีอินเทอร์เน็ต
 
 - บอร์ด: **ESP32 Dev Module** (ESP32-WROOM-32, แฟลช 4MB)
