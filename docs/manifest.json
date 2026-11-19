@@ -1,0 +1,16 @@
+{
+  "name": "ESP32 Live Code",
+  "version": "1.0.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        {
+          "path": "esp32-livecode-1.0.0.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

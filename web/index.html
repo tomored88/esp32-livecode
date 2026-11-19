@@ -1,0 +1,2564 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ESP32 Live Code</title>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --line:#d9dce1; --text:#1d2330; --muted:#6b7280; --accent:#1f7a4d; --stop:#b42318; --err:#c0262d; --sel:#2563eb; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font-family:system-ui,"Noto Sans Thai","Leelawadee UI",sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:10px; padding:6px 12px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; white-space:nowrap; }
+  #status { font-size:13px; padding:3px 10px; border-radius:99px; background:#e5e7eb; color:var(--muted); white-space:nowrap; }
+  #status.run { background:#dcfce7; color:var(--accent); }
+  #status.off { background:#fee2e2; color:var(--err); }
+  #info { font-size:12px; color:var(--muted); }
+  .sp { flex:1; }
+  button, select { font:inherit; font-size:14px; padding:6px 14px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); cursor:pointer; }
+  #run { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  #stop { background:var(--stop); color:#fff; border-color:var(--stop); font-weight:600; }
+  main { flex:1; display:flex; min-height:0; }
+  #left { flex:1.6; display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line); }
+  .tabs { display:flex; background:var(--panel); border-bottom:1px solid var(--line); }
+  .tabs button { border:0; border-radius:0; border-bottom:3px solid transparent; background:none; padding:8px 18px; color:var(--muted); }
+  .tabs button.on { color:var(--text); border-bottom-color:var(--sel); font-weight:600; }
+  .pane { flex:1; min-height:0; position:relative; }
+  #blocks { position:absolute; inset:0; }
+  #codePane { display:none; flex-direction:column; }
+  #manualBar { display:none; align-items:center; gap:8px; padding:6px 10px; background:#fef9c3; font-size:13px; border-bottom:1px solid var(--line); }
+  #manualBar button { font-size:12px; padding:2px 10px; }
+  .editor { flex:1; display:flex; min-height:0; background:#fff; }
+  #gutter { padding:10px 6px 10px 10px; text-align:right; color:#9ca3af; background:#f9fafb; border-right:1px solid var(--line); font:14px/1.5 Consolas,"Courier New",monospace; overflow:hidden; user-select:none; white-space:pre; }
+  #code { flex:1; resize:none; border:0; padding:10px; font:14px/1.5 Consolas,"Courier New",monospace; outline:none; tab-size:2; white-space:pre; overflow:auto; }
+  #right { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #vals { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; padding:8px; border-bottom:1px solid var(--line); max-height:45%; overflow:auto; }
+  #vals:empty { display:none; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; min-width:0; }
+  .card .k { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .v { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card svg { display:block; width:100%; height:30px; }
+  .card polyline { fill:none; stroke:var(--sel); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+  .bar { display:flex; align-items:center; padding:4px 8px; font-size:13px; color:var(--muted); border-bottom:1px solid var(--line); background:var(--panel); }
+  .bar button { font-size:12px; padding:2px 10px; }
+  #console { flex:1; overflow:auto; margin:0; padding:8px 12px; background:#111827; color:#e5e7eb; font:13px/1.45 Consolas,monospace; white-space:pre-wrap; word-break:break-word; }
+  #console .t1 { color:#fca5a5; }
+  #console .t2 { color:#9ca3af; }
+  #console .orig { color:#9ca3af; font-size:11px; padding-left:1.2em; }
+  #console .jump { cursor:pointer; }
+  #console .jump:hover { background:rgba(255,255,255,.06); }
+  #loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+  #fname { font-size:13px; color:var(--muted); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #fname.dirty::after { content:' •'; color:#d97706; }
+  #auto { display:none; font-size:12px; padding:2px 8px; border-radius:99px; background:#fef3c7; color:#92400e; white-space:nowrap; }
+  .menuwrap { position:relative; }
+  #menu { display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:50; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.15); padding:4px; min-width:220px; }
+  #menu.open { display:block; }
+  #menu button { display:block; width:100%; text-align:left; border:0; background:none; padding:8px 12px; border-radius:6px; }
+  #menu button:hover { background:#f3f4f6; }
+  #menu hr { border:0; border-top:1px solid var(--line); margin:4px 0; }
+  dialog { border:0; border-radius:10px; padding:0; width:min(440px, calc(100vw - 32px)); box-shadow:0 20px 50px rgba(0,0,0,.3); color:var(--text); }
+  dialog::backdrop { background:rgba(0,0,0,.35); }
+  .dh { padding:14px 18px 6px; font-weight:600; font-size:16px; }
+  .db { padding:6px 18px 12px; font-size:14px; max-height:60vh; overflow:auto; }
+  .db p { margin:6px 0; }
+  .db input[type=text], .db input[type=password] { width:100%; font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; margin:4px 0 8px; }
+  .db label { font-size:13px; color:var(--muted); }
+  .db > button { margin:2px 0 10px; }
+  .df { display:flex; gap:8px; justify-content:flex-end; padding:10px 18px 14px; flex-wrap:wrap; }
+  .primary { background:var(--sel); color:#fff; border-color:var(--sel); }
+  .danger { background:var(--stop); color:#fff; border-color:var(--stop); }
+  .row { display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #f0f1f3; }
+  .row .n { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row button { font-size:12px; padding:3px 10px; }
+  .row.pick { cursor:pointer; border-radius:6px; }
+  .row.pick:hover { background:#f3f4f6; }
+  .muted { color:var(--muted); font-size:12px; }
+  .err { color:var(--err); font-size:13px; min-height:1em; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#111827; color:#fff; padding:8px 16px; border-radius:8px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:100; max-width:calc(100vw - 32px); }
+  #toast.show { opacity:1; }
+  @media (max-width:800px) {
+    body { overflow:auto; }
+    main { flex-direction:column; flex:none; }
+    #left { border-right:0; border-bottom:1px solid var(--line); height:62vh; }
+    #right { height:50vh; }
+    #info, header .sp, #fname { display:none; }
+    header { gap:6px; padding:6px 8px; }
+    header h1 { display:none; }
+    #examples { flex:1; min-width:0; padding:6px 4px; }
+    header button { padding:6px 10px; }
+    #menuBtn .lbl { display:none; }
+    #menu { position:fixed; left:auto; right:8px; max-width:calc(100vw - 16px); }
+  }
+  /* ================= theme v2: look and feel ================= */
+  :root { --bg:#edf1f7; --panel:#fff; --line:#dbe2ec; --text:#172033; --muted:#64748b; --accent:#16a34a; --stop:#dc2626; --sel:#2563eb; --r:12px;
+          --sh:0 1px 2px rgba(15,23,42,.06), 0 6px 18px rgba(15,23,42,.07); }
+  body { font-size:15px; background:var(--bg); }
+  .sub { font-size:11.5px; color:#bcd0f0; margin-top:1px; white-space:nowrap; }
+  header { padding:8px 16px; gap:12px; background:linear-gradient(100deg,#0b1224 0%,#16306b 55%,#0e7490 100%); border:0; color:#fff;
+           box-shadow:0 2px 12px rgba(15,23,42,.35); position:relative; z-index:20; }
+  .brand { display:flex; align-items:center; gap:10px; min-width:0; }
+  .logo { width:40px; height:40px; padding:6px; border-radius:12px; background:linear-gradient(135deg,#38bdf8,#2563eb); box-shadow:0 2px 8px rgba(0,0,0,.35); flex:none; }
+  header h1 { font-size:17px; letter-spacing:.2px; margin:0; }
+  #fname { color:#cbd5e1; } #info { color:#9fb3d6; }
+  #status { background:rgba(255,255,255,.14); color:#e2e8f0; display:inline-flex; align-items:center; gap:7px; padding:4px 12px; }
+  #status::before { content:''; width:8px; height:8px; border-radius:50%; background:#94a3b8; }
+  #status.run { background:rgba(34,197,94,.2); color:#bbf7d0; }
+  #status.run::before { background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.3); animation:lcpulse 1.2s infinite; }
+  #status.off { background:rgba(239,68,68,.22); color:#fecaca; } #status.off::before { background:#ef4444; }
+  @keyframes lcpulse { 50% { box-shadow:0 0 0 7px rgba(34,197,94,0); } }
+  #auto { background:rgba(250,204,21,.2); color:#fde68a; }
+  header button { border-radius:10px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.1); color:#fff; transition:background .15s, transform .05s; }
+  header button:hover { background:rgba(255,255,255,.2); }
+  header button:active { transform:translateY(1px); }
+  #run { background:linear-gradient(#22c55e,#16a34a); border-color:#15803d; font-weight:700; padding:7px 22px; box-shadow:0 2px 8px rgba(22,163,74,.5); }
+  #run:hover { background:linear-gradient(#34d399,#16a34a); }
+  #stop { background:linear-gradient(#ef4444,#dc2626); border-color:#b91c1c; font-weight:700; }
+  #stop:hover { background:linear-gradient(#f87171,#dc2626); }
+  #menu { color:var(--text); border-radius:12px; box-shadow:0 12px 32px rgba(15,23,42,.25); }
+  #menu button { color:var(--text); border-radius:8px; }
+
+  .tabs { background:var(--panel); border-bottom:1px solid var(--line); padding:6px 10px 0; gap:4px; align-items:flex-end; }
+  .tabs > button { border:0; border-radius:10px 10px 0 0; padding:9px 16px; background:transparent; color:var(--muted); font-weight:600; }
+  .tabs > button:hover { background:#f3f6fb; }
+  .tabs > button.on { color:var(--sel); background:#eef3ff; border-bottom:0; box-shadow:inset 0 -3px 0 var(--sel); }
+  .tools { display:flex; gap:6px; padding-bottom:5px; flex-wrap:wrap; justify-content:flex-end; }
+  .tools button { padding:5px 10px; font-size:13px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); }
+  .tools button:hover { background:#eef3ff; border-color:#bfd0f6; }
+  .mini { font-size:12.5px; padding:4px 11px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); }
+  .mini:hover { background:#eef3ff; border-color:#bfd0f6; }
+  .badge { display:inline-block; min-width:18px; padding:0 6px; margin-left:4px; border-radius:99px; background:var(--sel); color:#fff; font-size:11.5px; line-height:18px; text-align:center; }
+  .badge.warn { background:#f59e0b; } .badge.hide { display:none; }
+  #left { border-right:1px solid var(--line); }
+  #blocks { background:#fbfcfe; }
+
+  #right { background:var(--bg); }
+  #consoleWrap { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #vals { background:var(--panel); }
+  .card { border-radius:10px; box-shadow:var(--sh); }
+  #console { background:#0f172a; color:#e2e8f0; padding:10px 14px; font-size:13.5px; line-height:1.55; }
+  #wiringPane { display:none; flex:1; overflow:auto; padding:12px 14px 20px; min-height:0; }
+  #wiringPane.on { display:block; }
+
+  /* wiring tab */
+  .wcard { background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:10px 12px; box-shadow:var(--sh); margin-bottom:10px; }
+  .exnote { background:#eff6ff; border-color:#bfdbfe; font-size:13.5px; line-height:1.55; }
+  .exnote b { display:block; margin-bottom:4px; }
+  .wsum { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; padding:10px 14px; margin-bottom:10px; background:linear-gradient(100deg,#ecfdf5,#eff6ff); border:1px solid #bbf7d0; border-radius:var(--r); font-size:13.5px; }
+  .wsum b { font-size:15px; }
+  .wh { display:flex; align-items:center; justify-content:space-between; margin:14px 2px 8px; font-size:14.5px; }
+  .wnote { font-size:12px; color:var(--muted); margin:4px 2px 10px; }
+  .wwarn { padding:9px 12px; border-radius:10px; font-size:13.5px; line-height:1.5; margin-bottom:8px; border:1px solid; }
+  .wwarn.err { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+  .wwarn.warn { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+  .wwarn.info { background:#f8fafc; border-color:var(--line); color:#334155; }
+  .diag { padding:4px; background:#fff; }
+  .boardsvg { width:100%; height:auto; display:block; }
+  .boardsvg .pcb { fill:#0f3d2e; stroke:#082a1f; stroke-width:2; }
+  .boardsvg .mod { fill:#1f2937; stroke:#4b5563; } .boardsvg .modt { fill:#9ca3af; font-size:17px; font-weight:700; text-anchor:middle; }
+  .boardsvg .ant { fill:none; stroke:#fbbf24; stroke-width:2.5; stroke-linejoin:round; }
+  .boardsvg .btn { fill:#cbd5e1; stroke:#64748b; } .boardsvg .btnt { fill:#cbd5e1; font-size:10px; text-anchor:middle; }
+  .boardsvg .usb { fill:#9ca3af; stroke:#6b7280; } .boardsvg .usbt { fill:#111827; font-size:11px; font-weight:700; text-anchor:middle; }
+  .boardsvg .pn { fill:#fff; font-size:12px; font-weight:700; }
+  .boardsvg .pl { fill:#172033; font-size:13px; font-weight:700; }
+  .boardsvg .pl.clash { fill:#b91c1c; }
+  .boardsvg text { font-family:inherit; }
+  .bigdiag { max-width:560px; margin:0 auto; }
+  .dev { background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--c); border-radius:var(--r); padding:10px 12px; margin-bottom:10px; box-shadow:var(--sh); }
+  .dev-h { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .dev-i { font-size:22px; } .dev-k { margin-left:auto; font-size:11.5px; color:var(--muted); background:#f1f5f9; border-radius:99px; padding:1px 9px; white-space:nowrap; }
+  .wires { border-collapse:collapse; width:100%; font-size:13.5px; }
+  .wires td { padding:4px 4px; vertical-align:middle; border-top:1px dashed #e8edf4; }
+  .wires tr:first-child td { border-top:0; }
+  .wc { width:34px; } .wsw { display:block; width:26px; height:7px; border-radius:4px; box-shadow:0 0 0 1px rgba(0,0,0,.18); }
+  .wp { font-weight:600; } .wa { width:18px; color:var(--muted); text-align:center; }
+  .bp { display:inline-flex; align-items:baseline; gap:6px; background:#0f3d2e; color:#fff; border-radius:7px; padding:2px 9px; font-size:13.5px; }
+  .bp small { color:#a7f3d0; font-size:11px; } .bp.rail { background:#334155; }
+  .via { font-size:11.5px; color:#b45309; margin-top:2px; }
+  .fix { font-size:13px; background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:6px 9px; margin-top:7px; line-height:1.45; }
+  .dnote { font-size:12.5px; color:#475569; margin-top:6px; line-height:1.45; }
+  .wlist { margin:0 0 8px 2px; padding-left:20px; font-size:13.5px; line-height:1.7; }
+  .wfoot { margin-top:14px; text-align:center; }
+  .wempty { text-align:center; padding:26px 16px; color:var(--muted); }
+  .wempty .wicon { font-size:38px; } .wempty b { display:block; color:var(--text); margin:6px 0 4px; font-size:16px; } .wempty p { margin:0; font-size:13.5px; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12.5px; justify-content:center; margin:8px 0; }
+  .lg i { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .tips p { margin:6px 0; font-size:13.5px; line-height:1.55; }
+
+  /* dialogs */
+  dialog { border-radius:16px; }
+  dialog.wide { width:min(960px, 96vw); }
+  .dh { font-size:17px; padding:16px 20px 8px; }
+  .db { padding:8px 20px 14px; }
+  .df { padding:12px 20px 16px; }
+  button.primary { background:linear-gradient(#3b82f6,#2563eb); border-color:#1d4ed8; font-weight:600; }
+  button.primary:hover { background:linear-gradient(#60a5fa,#2563eb); }
+
+  /* gallery */
+  .gal-search { width:100%; font:inherit; padding:10px 14px; border:1px solid var(--line); border-radius:10px; margin:2px 0 10px; background:#f8fafc; }
+  .gal-search:focus { outline:2px solid #93c5fd; background:#fff; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { padding:5px 13px; border-radius:99px; font-size:13px; border:1px solid var(--line); background:var(--panel); }
+  .chip.on { background:var(--sel); border-color:var(--sel); color:#fff; }
+  .gal-count { margin:8px 2px; }
+  .gal-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:12px; }
+  .ex-card { text-align:left; display:flex; flex-direction:column; gap:6px; padding:12px 13px; border-radius:14px; border:1px solid var(--line); background:var(--panel); box-shadow:var(--sh); transition:transform .12s, box-shadow .12s, border-color .12s; }
+  .ex-card:hover { transform:translateY(-2px); border-color:#93c5fd; box-shadow:0 8px 22px rgba(37,99,235,.18); }
+  .ex-top { display:flex; align-items:center; justify-content:space-between; }
+  .ex-ico { font-size:30px; line-height:1; } .ex-lv { font-size:11px; letter-spacing:1px; color:#f59e0b; }
+  .ex-t { font-size:14.5px; line-height:1.35; }
+  .ex-d { font-size:12.5px; color:var(--muted); line-height:1.45; flex:1; }
+  .ex-parts { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+  .pchip { font-size:11.5px; padding:2px 8px; border-radius:99px; background:#f1f5f9; color:#334155; white-space:nowrap; }
+  .pchip.ok { background:#dcfce7; color:#166534; }
+
+  /* block search + welcome */
+  .bs-list { display:flex; flex-direction:column; gap:3px; max-height:52vh; overflow:auto; }
+  .bs-row { display:flex; align-items:center; gap:10px; text-align:left; border:0; background:none; padding:7px 8px; border-radius:8px; }
+  .bs-row:hover, .bs-row:focus { background:#eef3ff; outline:none; }
+  .bs-row i { width:12px; height:12px; border-radius:4px; flex:none; }
+  .bs-t { font-weight:600; font-family:Consolas,monospace; font-size:13.5px; } .bs-row small { color:var(--muted); margin-left:auto; text-align:right; font-size:11.5px; }
+  .wlead { font-size:15px; line-height:1.6; margin:2px 0 12px; }
+  .wstep { display:flex; gap:12px; align-items:flex-start; padding:9px 0; }
+  .wn { flex:none; width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#38bdf8,#2563eb); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+  @media (max-width:800px) {
+    .sub, .brand h1 { display:none; }
+    .logo { width:34px; height:34px; }
+    #galleryBtn .lbl { display:none; }
+    .tools { width:100%; justify-content:flex-start; padding-bottom:6px; }
+    .tabs { flex-wrap:wrap; }
+    #left { flex:none; height:68vh; min-height:440px; }
+    #right { flex:none; height:auto; min-height:55vh; }
+    #console { min-height:200px; }
+    .gal-grid { grid-template-columns:1fr 1fr; gap:8px; }
+    .ex-d { display:none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><g stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 3v5M16 3v5M20 3v5M12 24v5M16 24v5M20 24v5M3 12h5M3 16h5M3 20h5M24 12h5M24 16h5M24 20h5"/></g><rect x="8" y="8" width="16" height="16" rx="3.5" fill="#fff"/><path d="M13 13.5l4 2.5-4 2.5" stroke="#2563eb" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 19h3" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <div><h1>ESP32 Live Code</h1><div class="sub">ลากบล็อก แล้วกดรัน — ทำงานบนบอร์ดทันที</div></div>
+  </div>
+  <span id="fname" title="ชื่อโปรแกรม"></span>
+  <span id="status">กำลังเชื่อมต่อ…</span>
+  <span id="auto" title="บอร์ดมีโปรแกรมที่รันเองตอนเปิดเครื่อง">⚡ autorun</span>
+  <span id="info"></span>
+  <span class="sp"></span>
+  <button id="galleryBtn" title="เลือกตัวอย่างโปรแกรม">📚<span class="lbl"> ตัวอย่างโปรแกรม</span></button>
+  <button id="run" title="รัน (Ctrl+Enter)">▶ รัน</button>
+  <button id="stop" title="หยุดโปรแกรม">■ หยุด</button>
+  <span class="menuwrap">
+    <button id="menuBtn" title="เมนู">☰<span class="lbl"> เมนู</span></button>
+    <div id="menu">
+      <button data-a="new">ใหม่</button>
+      <button data-a="open">เปิดจากบอร์ด…</button>
+      <button data-a="save">บันทึกลงบอร์ด (Ctrl+S)</button>
+      <button data-a="saveas">บันทึกเป็นชื่อใหม่…</button>
+      <hr>
+      <button data-a="autorun">ตั้งเป็นโปรแกรม autorun</button>
+      <button data-a="noauto">ยกเลิก autorun</button>
+      <hr>
+      <button data-a="export">ส่งออกไฟล์ .json ลงเครื่อง</button>
+      <button data-a="import">นำเข้าไฟล์ .json</button>
+      <hr>
+      <button data-a="help">❓ วิธีใช้งานเบื้องต้น</button>
+      <button data-a="pins">📍 แผนผังขา ESP32</button>
+      <hr>
+      <button data-a="wifi">ตั้งค่า WiFi…</button>
+      <button data-a="reboot">รีบูตบอร์ด</button>
+    </div>
+  </span>
+</header>
+<main>
+  <section id="left">
+    <div class="tabs">
+      <button id="tabBlocks" class="on">🧩 บล็อก</button>
+      <button id="tabCode">{ } โค้ด Lua</button>
+      <span class="sp"></span>
+      <span class="tools" id="tools">
+        <button id="tbUndo" title="ย้อนกลับ (Ctrl+Z)">↶</button>
+        <button id="tbRedo" title="ทำซ้ำ (Ctrl+Y)">↷</button>
+        <button id="tbFit" title="จัดบล็อกให้พอดีจอ">⌖ พอดีจอ</button>
+        <button id="tbSearch" title="ค้นหาบล็อก (Ctrl+K)">🔍 ค้นหาบล็อก</button>
+        <button id="tbPins" title="แผนผังขา ESP32">📍 แผนผังขา</button>
+      </span>
+    </div>
+    <div class="pane" id="blocksPane"><div id="blocks"></div><div id="loading">กำลังโหลดบล็อก…</div></div>
+    <div class="pane" id="codePane">
+      <div id="manualBar">✎ โค้ดเขียนเอง — ปุ่มรันจะใช้โค้ดนี้แทนบล็อก <span class="sp"></span><button id="discard">ทิ้งการแก้ ใช้โค้ดจากบล็อก</button></div>
+      <div class="editor"><div id="gutter">1</div><textarea id="code" spellcheck="false" wrap="off"></textarea></div>
+    </div>
+  </section>
+  <section id="right">
+    <div class="tabs rtabs">
+      <button id="rtConsole" class="on">🖥 คอนโซล</button>
+      <button id="rtWiring">🔌 การต่อสาย<span id="wireBadge" class="badge hide"></span></button>
+      <span class="sp"></span>
+      <span class="tools"><button id="clr" class="mini">ล้างคอนโซล</button></span>
+    </div>
+    <div id="consoleWrap"><div id="vals"></div><pre id="console"></pre></div>
+    <div id="wiringPane"></div>
+  </section>
+</main>
+<dialog id="dlg"><div class="dh" id="dlgTitle"></div><div class="db" id="dlgBody"></div><div class="df" id="dlgFoot"></div></dialog>
+<div id="toast"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<script src="/blockly.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+// ------------------------------------------------------------------ pins
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+const OUT_PINS = [2, 4, 5, ...range(12, 19), 21, 22, 23, 25, 26, 27, 32, 33];
+const IN_PINS = [0, ...OUT_PINS, 34, 35, 36, 39];
+const ADC_PINS = [32, 33, 34, 35, 36, 39];               // ADC1 only: ADC2 is unusable while WiFi is on
+const TOUCH = [[4, 0], [0, 1], [2, 2], [15, 3], [13, 4], [12, 5], [14, 6], [27, 7], [33, 8], [32, 9]];
+const PIN_HINT = { 0: ' (BOOT)', 2: ' (LED)', 12: ' ⚠', 15: ' ⚠' };      // short hints in pin drop-downs
+const opts = pins => pins.map(p => ['GPIO' + p + (PIN_HINT[p] || ''), String(p)]);
+const TOUCH_OPTS = TOUCH.map(([g, t]) => ['T' + t + ' (GPIO' + g + ')', String(g)]);
+
+const C = { io: '#d97706', board: '#0891b2', time: '#7c3aed', disp: '#16a34a', ctl: '#ca8a04', math: '#5b67a5',
+  i2c: '#0f766e', oled: '#475569', lcd: '#4d7c0f', act: '#be185d' };
+const NOTES = [['C4 (โด)', '262'], ['D4 (เร)', '294'], ['E4 (มี)', '330'], ['F4 (ฟา)', '349'], ['G4 (ซอล)', '392'], ['A4 (ลา)', '440'],
+  ['B4 (ที)', '494'], ['C5 (โด สูง)', '523'], ['D5', '587'], ['E5', '659'], ['F5', '698'], ['G5', '784'], ['A5', '880'], ['B5', '988'], ['C6', '1047'], ['พัก (เงียบ)', '0']];
+const I2C_PINS = opts([21, 22, 4, 5, 13, 14, 15, 16, 17, 18, 19, 23, 25, 26, 27, 32, 33]);
+const I2C_PINS_SCL = [I2C_PINS[1], I2C_PINS[0], ...I2C_PINS.slice(2)];   // GPIO22 first
+const WIRE = ' — ต่อ SDA=GPIO21, SCL=GPIO22, VCC=3.3V, GND';
+
+// ------------------------------------------------------------------ custom blocks
+const ok = typeof Blockly !== 'undefined';
+if (ok) {
+  // Block text in code style: English wording for every built-in block, Lua words where they fit.
+  // Tooltips and the rest of the UI (menus, dialogs) stay Thai.
+  const EN = window.BLOCKLY_MSG_EN || {};
+  for (const k in EN) {
+    if (/^(CONTROLS|LOGIC|MATH|TEXT|LISTS|VARIABLES|PROCEDURES)_/.test(k) && !/TOOLTIP|HELPURL|WARNING/.test(k)) Blockly.Msg[k] = EN[k];
+  }
+  Object.assign(Blockly.Msg, {
+    CONTROLS_IF_MSG_IF: 'if', CONTROLS_IF_MSG_THEN: 'then', CONTROLS_IF_MSG_ELSEIF: 'elseif', CONTROLS_IF_MSG_ELSE: 'else',
+    CONTROLS_REPEAT_TITLE: 'repeat %1 times', CONTROLS_WHILEUNTIL_INPUT_DO: 'do',
+    CONTROLS_WHILEUNTIL_OPERATOR_WHILE: 'while', CONTROLS_WHILEUNTIL_OPERATOR_UNTIL: 'until',
+    CONTROLS_FOR_TITLE: 'for %1 = %2, %3, %4', CONTROLS_FOREACH_TITLE: 'for %1 in %2',
+    CONTROLS_FLOW_STATEMENTS_OPERATOR_BREAK: 'break', CONTROLS_FLOW_STATEMENTS_OPERATOR_CONTINUE: 'continue',
+    VARIABLES_SET: '%1 = %2',
+    TEXT_PRINT_TITLE: 'print %1', TEXT_JOIN_TITLE_CREATEWITH: 'join', TEXT_LENGTH_TITLE: '#%1',
+    LISTS_CREATE_WITH_INPUT_WITH: 'list', LISTS_CREATE_EMPTY_TITLE: '{ }', LISTS_LENGTH_TITLE: '#%1',
+    PROCEDURES_DEFNORETURN_TITLE: 'function', PROCEDURES_DEFRETURN_TITLE: 'function', PROCEDURES_BEFORE_PARAMS: '(',
+    PROCEDURES_DEFNORETURN_PROCEDURE: 'doSomething', PROCEDURES_DEFRETURN_PROCEDURE: 'calc',
+    PROCEDURES_CALL_BEFORE_PARAMS: '(', PROCEDURES_DEFRETURN_RETURN: 'return',
+    VARIABLES_DEFAULT_NAME: 'item', UNNAMED_KEY: 'unnamed',
+  });
+  Blockly.common.defineBlocksWithJsonArray([
+    { type: 'io_pin_mode', message0: 'pinMode %1 %2',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(IN_PINS) },
+              { type: 'field_dropdown', name: 'MODE', options: [['OUTPUT', 'OUTPUT'], ['INPUT', 'INPUT'], ['INPUT_PULLUP', 'INPUT_PULLUP'], ['INPUT_PULLDOWN', 'INPUT_PULLDOWN']] }],
+      previousStatement: null, nextStatement: null, colour: C.io, tooltip: 'กำหนดโหมดของขา (GPIO34-39 เป็นรับเข้าเท่านั้น)' },
+    { type: 'io_digital_write', message0: 'digitalWrite %1 %2',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'STATE', options: [['HIGH', 'HIGH'], ['LOW', 'LOW']] }],
+      previousStatement: null, nextStatement: null, colour: C.io, tooltip: 'สั่งขาให้เป็น HIGH (3.3V) หรือ LOW (0V)' },
+    { type: 'io_digital_write_n', message0: 'digitalWrite %1 %2',
+      args0: [{ type: 'input_value', name: 'PIN', check: 'Number' },
+              { type: 'field_dropdown', name: 'STATE', options: [['HIGH', 'HIGH'], ['LOW', 'LOW']] }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.io,
+      tooltip: 'เขียนขาที่เลขมาจากตัวแปร/รายการ (เช่นวนทีละขา) ตั้งเป็นขาส่งออกให้เอง' },
+    { type: 'io_digital_toggle', message0: 'toggle %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) }],
+      previousStatement: null, nextStatement: null, colour: C.io, tooltip: 'ถ้าเปิดอยู่ให้ปิด ถ้าปิดอยู่ให้เปิด' },
+    { type: 'io_digital_read', message0: 'digitalRead %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(IN_PINS) }],
+      output: 'Number', colour: C.io, tooltip: 'ได้ 1 (HIGH) หรือ 0 (LOW)' },
+    { type: 'io_digital_is_high', message0: 'digitalRead %1 == HIGH',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(IN_PINS) }],
+      output: 'Boolean', colour: C.io, tooltip: 'จริง ถ้าขาเป็น HIGH' },
+    { type: 'io_analog_read', message0: 'analogRead %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      output: 'Number', colour: C.io, tooltip: 'ค่า 0-4095 (0-3.3V)' },
+    { type: 'io_pwm', message0: 'analogWrite %1 %2',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) }, { type: 'input_value', name: 'VALUE', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.io, tooltip: 'PWM 0-255: ปรับความสว่าง/ความเร็ว 0 = ปิด, 255 = เต็มที่' },
+    { type: 'io_touch_read', message0: 'touchRead %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: TOUCH_OPTS }],
+      output: 'Number', colour: C.io, tooltip: 'ค่าจะลดลงเมื่อแตะ (ไม่แตะ ~60-110, แตะ ~10-30)' },
+
+    { type: 'board_led', message0: 'digitalWrite LED_BUILTIN %1',
+      args0: [{ type: 'field_dropdown', name: 'STATE', options: [['HIGH', 'HIGH'], ['LOW', 'LOW']] }],
+      previousStatement: null, nextStatement: null, colour: C.board, tooltip: 'LED สีฟ้าบนบอร์ด (GPIO2)' },
+    { type: 'board_boot', message0: 'BOOT pressed', output: 'Boolean', colour: C.board, tooltip: 'จริง เมื่อกดปุ่ม BOOT บนบอร์ด (digitalRead(0) == LOW)' },
+
+    { type: 'time_delay_ms', message0: 'delay %1 ms', args0: [{ type: 'input_value', name: 'MS', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.time, tooltip: '1000 มิลลิวินาที = 1 วินาที' },
+    { type: 'time_delay_s', message0: 'delay %1 s', args0: [{ type: 'input_value', name: 'S', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.time, tooltip: 'รอเป็นวินาที (ทศนิยมได้ เช่น 0.5)' },
+    { type: 'time_millis', message0: 'millis()', output: 'Number', colour: C.time, tooltip: 'มิลลิวินาทีตั้งแต่บอร์ดเริ่มทำงาน' },
+
+    { type: 'disp_show', message0: 'show %1 %2',
+      args0: [{ type: 'field_input', name: 'NAME', text: 'value' }, { type: 'input_value', name: 'VALUE' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.disp, tooltip: 'แสดงเป็นการ์ดด้านขวา ถ้าเป็นตัวเลขจะมีกราฟ' },
+    { type: 'disp_clear', message0: 'clear()', previousStatement: null, nextStatement: null, colour: C.disp, tooltip: 'ล้างคอนโซลและการ์ดค่า' },
+
+    { type: 'ctl_forever', message0: 'while true do %1 %2', args0: [{ type: 'input_dummy' }, { type: 'input_statement', name: 'DO' }],
+      previousStatement: null, colour: C.ctl, tooltip: 'ทำคำสั่งข้างในวนไปเรื่อย ๆ จนกดหยุด' },
+
+    { type: 'math_round_to', message0: 'round %1 digits %2',
+      args0: [{ type: 'input_value', name: 'X', check: 'Number' }, { type: 'field_dropdown', name: 'N', options: [['0', '0'], ['1', '1'], ['2', '2'], ['3', '3']] }],
+      inputsInline: true, output: 'Number', colour: C.math, tooltip: 'ปัดเศษให้เหลือทศนิยมตามที่เลือก เช่น round(23.456, 1) = 23.5' },
+
+    // ---- I2C + sensors
+    { type: 'i2c_begin', message0: 'i2c.begin SDA %1 SCL %2',
+      args0: [{ type: 'field_dropdown', name: 'SDA', options: I2C_PINS }, { type: 'field_dropdown', name: 'SCL', options: I2C_PINS_SCL }],
+      previousStatement: null, nextStatement: null, colour: C.i2c,
+      tooltip: 'เลือกขา I2C (ไม่ใส่บล็อกนี้ = ใช้ SDA=GPIO21, SCL=GPIO22)' },
+    { type: 'i2c_scan', message0: 'i2c.scan()', previousStatement: null, nextStatement: null, colour: C.i2c,
+      tooltip: 'ค้นหาอุปกรณ์ I2C ที่ต่ออยู่ แล้วพิมพ์ที่อยู่ + ชื่ออุปกรณ์ที่รู้จักลงคอนโซล' },
+    { type: 'i2c_read_reg', message0: 'i2c.readReg addr %1 reg %2',
+      args0: [{ type: 'input_value', name: 'ADDR', check: 'Number' }, { type: 'input_value', name: 'REG', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c, tooltip: 'อ่าน 1 ไบต์จาก register ของอุปกรณ์ I2C (ที่อยู่ 0x3C = 60)' },
+    { type: 'i2c_write_reg', message0: 'i2c.writeReg addr %1 reg %2 value %3',
+      args0: ['ADDR', 'REG', 'VALUE'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.i2c, tooltip: 'เขียน 1 ไบต์ลง register ของอุปกรณ์ I2C' },
+    { type: 'sens_aht20', message0: 'aht20.%1()',
+      args0: [{ type: 'field_dropdown', name: 'Q', options: [['temperature °C', 'temperature'], ['humidity %', 'humidity']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'อุณหภูมิ/ความชื้นจาก AHT20 หรือ AHT10 (I2C 0x38)' + WIRE },
+    { type: 'sens_sht31', message0: 'sht31.%1()',
+      args0: [{ type: 'field_dropdown', name: 'Q', options: [['temperature °C', 'temperature'], ['humidity %', 'humidity']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'อุณหภูมิ/ความชื้นจาก SHT30/SHT31/SHT35 (I2C 0x44 หรือ 0x45)' + WIRE },
+    { type: 'sens_bme280', message0: 'bme280.%1()',
+      args0: [{ type: 'field_dropdown', name: 'Q', options: [['temperature °C', 'temperature'], ['humidity %', 'humidity'], ['pressure hPa', 'pressure']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'BME280 หรือ BMP280 (I2C 0x76/0x77) — BMP280 ไม่มีความชื้น' + WIRE },
+    { type: 'sens_bh1750', message0: 'bh1750.lux()', output: 'Number', colour: C.i2c,
+      tooltip: 'ความสว่างเป็น lux (ห้องทั่วไป 100-500, กลางแดด 10000+) BH1750 ที่ I2C 0x23' + WIRE },
+    { type: 'sens_mpu_accel', message0: 'mpu6050.accel(%1) g',
+      args0: [{ type: 'field_dropdown', name: 'AXIS', options: [['x', 'x'], ['y', 'y'], ['z', 'z']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'ความเร่งตามแกน หน่วย g (วางนิ่งแกนที่ชี้ขึ้นจะได้ประมาณ 1) MPU6050 ที่ 0x68' + WIRE },
+    { type: 'sens_mpu_gyro', message0: 'mpu6050.gyro(%1) °/s',
+      args0: [{ type: 'field_dropdown', name: 'AXIS', options: [['x', 'x'], ['y', 'y'], ['z', 'z']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'ความเร็วการหมุนรอบแกน องศาต่อวินาที' + WIRE },
+    { type: 'sens_mpu_angle', message0: 'mpu6050.angle(%1) °',
+      args0: [{ type: 'field_dropdown', name: 'W', options: [['pitch', 'pitch'], ['roll', 'roll']] }],
+      output: 'Number', colour: C.i2c, tooltip: 'มุมเอียงจากแรงโน้มถ่วง (pitch = ก้ม/เงย, roll = เอียงซ้าย/ขวา) -90 ถึง 90' + WIRE },
+
+    // ---- OLED SSD1306 128x64
+    // ---- DHT22 / DHT11
+    { type: 'sens_dht', message0: 'dht.%1 pin %2 %3',
+      args0: [{ type: 'field_dropdown', name: 'Q', options: [['temperature °C', 'temperature'], ['humidity %', 'humidity']] },
+              { type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'TYPE', options: [['DHT22', 'dht22'], ['DHT11', 'dht11']] }],
+      output: 'Number', colour: C.i2c,
+      tooltip: 'อุณหภูมิ/ความชื้นจาก DHT22 (AM2302) หรือ DHT11 — ต่อ VCC → 3.3V, GND, DATA → ขาที่เลือก\n' +
+        '(ตัวเปล่า 4 ขาให้ต่อตัวต้านทาน 10k จาก DATA ไป VCC) · อ่านใหม่ได้ทุก 2 วินาที ระหว่างนั้นได้ค่าล่าสุด' },
+
+    // ---- analog sensors (ADC1 pins 32-39), steady median reading -> %
+    { type: 'sens_soil', message0: 'soil.moisture pin %1 dry %2 wet %3 %%',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) },
+              { type: 'input_value', name: 'DRY', check: 'Number' }, { type: 'input_value', name: 'WET', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c,
+      tooltip: 'ความชื้นในดิน 0-100%% — ต่อ AOUT → ขา 32-39, VCC → 3.3V, GND\n' +
+        'dry/wet = ค่าดิบตอนดินแห้ง (ในอากาศ) และตอนแช่น้ำ ใช้ตัวอย่าง "ปรับเทียบเซนเซอร์ความชื้นดิน" หาค่าของเซนเซอร์ตัวเอง\n' +
+        'ค่าเริ่มต้น 2800/1200 = เซนเซอร์แบบ capacitive v1.2 · แบบ 2 ขาเหล็ก (resistive) ลอง dry 4095 wet 1500' },
+    { type: 'sens_light', message0: 'light.level pin %1 %%',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      output: 'Number', colour: C.i2c,
+      tooltip: 'ความสว่าง 0-100%% จากโมดูล LDR (ตัวต้านทานแปรค่าตามแสง) — ต่อ AO → ขา 32-39\n' +
+        'ถ้าได้ค่ากลับด้าน (มืด = สูง) ใช้บล็อก sensor.percent แล้วสลับค่า 0%%/100%%' },
+    { type: 'sens_percent', message0: 'sensor.percent pin %1 0%% at %2 100%% at %3',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) },
+              { type: 'input_value', name: 'A0', check: 'Number' }, { type: 'input_value', name: 'A100', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c,
+      tooltip: 'แปลงเซนเซอร์อนาล็อกใดก็ได้ (ระดับน้ำ, ฝน, ตัวต้านทานปรับค่า ...) เป็น 0-100%%\nใส่ค่าดิบที่ควรเป็น 0%% และ 100%%' },
+    { type: 'sens_raw', message0: 'sensor.raw pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      output: 'Number', colour: C.i2c, tooltip: 'ค่าดิบ 0-4095 แบบนิ่ง (ค่ากลางจากการอ่าน 9 ครั้ง) ใช้หาค่าปรับเทียบ' },
+
+    // ---- buzzer + servo
+    { type: 'act_tone', message0: 'tone pin %1 %2 Hz %3 ms',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) },
+              { type: 'input_value', name: 'FREQ', check: 'Number' }, { type: 'input_value', name: 'MS', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.act,
+      tooltip: 'เล่นเสียงความถี่ Hz นาน ms มิลลิวินาที แล้วเงียบ (บัซเซอร์แบบ passive)\n' +
+        'ต่อ + → ขาที่เลือก, − → GND · บัซเซอร์แบบ active (มีเสียงเองเมื่อจ่ายไฟ) ใช้ digitalWrite HIGH/LOW แทน' },
+    { type: 'act_notone', message0: 'noTone pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) }],
+      previousStatement: null, nextStatement: null, colour: C.act, tooltip: 'หยุดเสียง' },
+    { type: 'act_note', message0: 'note %1', args0: [{ type: 'field_dropdown', name: 'N', options: NOTES }],
+      output: 'Number', colour: C.act, tooltip: 'ความถี่ของโน้ตดนตรี (Hz) ใช้กับบล็อก tone' },
+    { type: 'act_relay', message0: 'relay pin %1 %2 module %3',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'ON', options: [['ON', 'true'], ['OFF', 'false']] },
+              { type: 'field_dropdown', name: 'LOW', options: [['LOW-trigger', 'true'], ['HIGH-trigger', 'false']] }],
+      previousStatement: null, nextStatement: null, colour: C.act,
+      tooltip: 'เปิด/ปิดรีเลย์ — ต่อ IN → ขาที่เลือก, VCC → 5V, GND → GND\n' +
+        'LOW-trigger = โมดูลส่วนใหญ่ (ทำงานเมื่อขาเป็น LOW) ถ้ารีเลย์ติด/ดับกลับด้าน ให้เปลี่ยนเป็น HIGH-trigger\n' +
+        'กดหยุดโปรแกรมหรือโปรแกรม error = รีเลย์ที่ใช้อยู่จะถูกปิดให้เอง' },
+    { type: 'act_motor', message0: 'motor.run IN1 %1 IN2 %2 EN %3 speed %4 %%',
+      args0: [{ type: 'field_dropdown', name: 'IN1', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'IN2', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'EN', options: [['— ไม่ใช้', '-1'], ...opts(OUT_PINS)] },
+              { type: 'input_value', name: 'SPEED', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.act,
+      tooltip: 'หมุนมอเตอร์ DC ผ่านบอร์ดขับมอเตอร์ ความเร็ว -100 ถึง 100 (ติดลบ = หมุนกลับ, 0 = หยุด)\n' +
+        'L9110S / DRV8833 / L298N ที่เสียบจัมเปอร์ ENA: ใช้ IN1, IN2 และ EN = ไม่ใช้\n' +
+        'L298N ถอดจัมเปอร์ ENA / TB6612: ต่อขา ENA/PWMA เข้า EN · มอเตอร์ส่วนใหญ่เริ่มหมุนที่ ~30-40%%\n' +
+        'ห้ามต่อมอเตอร์เข้าขา ESP32 ตรง ๆ — ต้องผ่านบอร์ดขับเสมอ' },
+    { type: 'act_motor_stop', message0: 'motor.stop IN1 %1 IN2 %2 EN %3',
+      args0: [{ type: 'field_dropdown', name: 'IN1', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'IN2', options: opts(OUT_PINS) },
+              { type: 'field_dropdown', name: 'EN', options: [['— ไม่ใช้', '-1'], ...opts(OUT_PINS)] }],
+      previousStatement: null, nextStatement: null, colour: C.act, tooltip: 'หยุดมอเตอร์ (ปล่อยหมุนจนหยุดเอง)' },
+    { type: 'act_servo', message0: 'servo.write pin %1 angle %2 °',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) }, { type: 'input_value', name: 'ANGLE', check: 'Number' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.act,
+      tooltip: 'หมุนเซอร์โว (SG90, MG90S) ไปที่มุม 0-180°\nสายส้ม/เหลือง → ขาที่เลือก, แดง → 5V, น้ำตาล → GND (อย่าใช้ไฟ 3.3V เลี้ยงเซอร์โว)' },
+
+    // ---- MQ-2 gas (through a 10k/20k voltage divider)
+    { type: 'sens_mq_level', message0: 'mq2.level pin %1 %%',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      output: 'Number', colour: C.i2c,
+      tooltip: 'ระดับแก๊ส/ควันแบบสัมพัทธ์ 0-100%% (ไม่ต้องปรับเทียบ) อากาศสะอาดราว 10-20%%\n' +
+        'ต่อ MQ-2: VCC → 5V, GND → GND, AO → ตัวต้านทาน 10k → ขา 32-39 → ตัวต้านทาน 20k → GND\n' +
+        '(ตัวแบ่งแรงดัน: AO สูงได้ถึง 5V แต่ ESP32 รับได้ 3.3V) · ห้ามต่อขา DO ตรงเข้า ESP32\n' +
+        'ต้องอุ่นเซนเซอร์ 1-3 นาทีหลังเปิดไฟ ค่าถึงจะนิ่ง' },
+    { type: 'sens_mq_ppm', message0: 'mq2.ppm pin %1 gas %2 ppm',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) },
+              { type: 'field_dropdown', name: 'GAS', options: [['LPG (แก๊สหุงต้ม)', 'lpg'], ['CO', 'co'], ['H2', 'h2'], ['แอลกอฮอล์', 'alcohol'], ['โพรเพน', 'propane']] }],
+      output: 'Number', colour: C.i2c,
+      tooltip: 'ปริมาณแก๊สโดยประมาณ (ppm) จากกราฟใน datasheet — ต้องปรับเทียบด้วย mq2.calibrate ก่อน 1 ครั้ง\n' +
+        'เป็นค่าประมาณ ไม่ใช่เครื่องวัดมาตรฐาน ห้ามใช้แทนอุปกรณ์ความปลอดภัย' },
+    { type: 'sens_mq_volt', message0: 'mq2.voltage pin %1 V',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      output: 'Number', colour: C.i2c, tooltip: 'แรงดันขา AO ของโมดูลจริง (คูณกลับจากตัวแบ่งแรงดันแล้ว) 0-5V ใช้ตรวจสาย' },
+    { type: 'sens_mq_cal', message0: 'mq2.calibrate pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) }],
+      previousStatement: null, nextStatement: null, colour: C.i2c,
+      tooltip: 'ปรับเทียบในอากาศสะอาด (ใช้เวลา 5 วินาที) แล้วบันทึกค่าไว้บนบอร์ด ทำครั้งเดียว\nอุ่นเซนเซอร์อย่างน้อย 2-3 นาทีก่อน' },
+
+    // ---- rain sensor + water level strip
+    { type: 'sens_rain', message0: 'rain.level pin %1 dry %2 wet %3 %%',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) },
+              { type: 'input_value', name: 'DRY', check: 'Number' }, { type: 'input_value', name: 'WET', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c,
+      tooltip: 'ความเปียกจากบอร์ดเซนเซอร์ฝน (FC-37 / YL-83) 0-100%% — 0 = แห้ง, ยิ่งเปียกยิ่งสูง\n' +
+        'ต่อ AO → ขา 32-39, VCC → 3.3V (ใช้ 3.3V เพื่อให้สัญญาณไม่เกิน 3.3V), GND\n' +
+        'dry/wet = ค่าดิบตอนแห้งและตอนมีน้ำ (ค่าเริ่มต้น 4095/1500) หาค่าของเซนเซอร์ตัวเองด้วยบล็อก sensor.raw' },
+    { type: 'sens_water', message0: 'water.level pin %1 power %2 empty %3 full %4 %%',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(ADC_PINS) },
+              { type: 'field_dropdown', name: 'POWER', options: [['— ไม่ใช้ (ต่อ 3.3V)', '-1'], ...opts(OUT_PINS)] },
+              { type: 'input_value', name: 'EMPTY', check: 'Number' }, { type: 'input_value', name: 'FULL', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c,
+      tooltip: 'ระดับน้ำ 0-100%% จากแผ่นเซนเซอร์ระดับน้ำ (3 ขา: S, +, -) — S → ขา 32-39, - → GND\n' +
+        'แผ่นที่มีรางโลหะเปลือยจะผุกร่อนเร็วถ้าจ่ายไฟค้าง: เลือก power เป็นขา GPIO แล้วต่อ + เข้าขานั้น\n' +
+        'ระบบจะจ่ายไฟแค่ ~20 ms ตอนวัด · empty/full = ค่าดิบตอนไม่มีน้ำและตอนจมถึงขีดสูงสุด (ค่าเริ่มต้น 0/2000)' },
+
+    // ---- PIR motion
+    { type: 'sens_pir', message0: 'pir.motion pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(IN_PINS) }],
+      output: 'Boolean', colour: C.i2c,
+      tooltip: 'จริง เมื่อเซนเซอร์ PIR (HC-SR501, AM312) เห็นการเคลื่อนไหว\n' +
+        'ต่อ VCC → 5V (HC-SR501) หรือ 3.3V (AM312), GND, OUT → ขาที่เลือก\n' +
+        'หลังเปิดไฟ HC-SR501 ต้องรอ ~30-60 วินาทีให้เซนเซอร์นิ่งก่อน' },
+
+    // ---- DS18B20 (1-Wire)
+    { type: 'sens_ds18b20', message0: 'ds18b20.temperature pin %1 sensor %2 °C',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) },
+              { type: 'input_value', name: 'N', check: 'Number' }],
+      inputsInline: true, output: 'Number', colour: C.i2c,
+      tooltip: 'อุณหภูมิจาก DS18B20 (รุ่นกันน้ำแบบสายก็ได้) -55 ถึง 125°C\n' +
+        'ต่อ VDD (แดง) → 3.3V, GND (ดำ) → GND, DATA (เหลือง) → ขาที่เลือก + ตัวต้านทาน 4.7k จาก DATA ไป 3.3V\n' +
+        'หลายตัวต่อพ่วงสายเดียวกันได้ (สูงสุด 8) เลือกตัวที่ 1, 2, ... · อ่านทีละรอบใช้เวลา ~0.8 วินาที' },
+    { type: 'sens_ds18b20_count', message0: 'ds18b20.count pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: opts(OUT_PINS) }],
+      output: 'Number', colour: C.i2c, tooltip: 'จำนวน DS18B20 ที่ต่ออยู่บนขานี้ (0 = ไม่พบ)' },
+
+    // ---- HC-SR04 ultrasonic distance
+    { type: 'sens_ultrasonic', message0: 'ultrasonic.distance trig %1 echo %2 cm',
+      args0: [{ type: 'field_dropdown', name: 'TRIG', options: opts(OUT_PINS) }, { type: 'field_dropdown', name: 'ECHO', options: opts(IN_PINS) }],
+      output: 'Number', colour: C.i2c,
+      tooltip: 'ระยะทางเป็นเซนติเมตร (2-400 cm) จาก HC-SR04 · ได้ -1 เมื่อไม่มีอะไรในระยะ\n' +
+        'ต่อ VCC → 5V, GND, trig → ขา trig, echo → ตัวต้านทานแบ่งแรงดัน (1k/2k) → ขา echo\n' +
+        '(echo ของ HC-SR04 เป็น 5V — รุ่น HC-SR04P ใช้ 3.3V ต่อตรงได้)' },
+
+    // ---- character LCD 16x2 / 20x4 with I2C backpack (PCF8574)
+    { type: 'lcd_begin', message0: 'lcd.begin %1',
+      args0: [{ type: 'field_dropdown', name: 'SIZE', options: [['16x2', '16, 2'], ['20x4', '20, 4']] }],
+      previousStatement: null, nextStatement: null, colour: C.lcd,
+      tooltip: 'เลือกขนาดจอ LCD (ไม่ใส่ = 16x2) — หาที่อยู่ I2C ให้เอง (ส่วนใหญ่ 0x27 หรือ 0x3F)' },
+    { type: 'lcd_clear', message0: 'lcd.clear()', previousStatement: null, nextStatement: null, colour: C.lcd },
+    { type: 'lcd_text', message0: 'lcd.text col %1 row %2 %3',
+      args0: [{ type: 'input_value', name: 'COL', check: 'Number' }, { type: 'input_value', name: 'ROW', check: 'Number' }, { type: 'input_value', name: 'TEXT' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.lcd,
+      tooltip: 'เขียนที่ช่อง col (0-15) บรรทัด row (0-1) — จอ LCD ไม่มีตัวอักษรไทย (ขึ้นเป็น ?)\n' +
+        'ตัวเลขที่สั้นลงจะเหลือหลักเก่าค้าง: ต่อช่องว่างท้ายข้อความ หรือ lcd.clear() ก่อน' },
+    { type: 'lcd_backlight', message0: 'lcd.backlight %1',
+      args0: [{ type: 'field_dropdown', name: 'ON', options: [['on', 'true'], ['off', 'false']] }],
+      previousStatement: null, nextStatement: null, colour: C.lcd },
+
+    { type: 'oled_begin', message0: 'oled.begin %1',
+      args0: [{ type: 'field_dropdown', name: 'TYPE', options: [['SSD1306 0.96" 128x64', 'ssd1306'], ['SH1106 1.3" 128x64', 'sh1106'], ['SSD1306 0.91" 128x32', 'ssd1306_32']] }],
+      previousStatement: null, nextStatement: null, colour: C.oled,
+      tooltip: 'เลือกชนิดจอ: SSD1306 0.96 นิ้ว (ส่วนใหญ่), SH1106 1.3 นิ้ว หรือจอแถบ 0.91 นิ้ว 128x32\n' +
+        'จอ 128x32: y = 0-31 ภาษาไทยได้ 1 บรรทัด (หรือฟอนต์เล็ก 4 บรรทัด)\n' +
+        'วางไว้ก่อนบล็อกจออื่น ๆ — ถ้าไม่ใส่ จะถือว่าเป็น SSD1306\nจอ 1.3 นิ้วที่ภาพเลื่อน/มีขยะด้านข้าง = SH1106' },
+    { type: 'oled_clear', message0: 'oled.clear()', previousStatement: null, nextStatement: null, colour: C.oled,
+      tooltip: 'ล้างจอ OLED (128x64, I2C 0x3C) — ภาพจะขึ้นจอตอน delay หรือ oled.show()' },
+    { type: 'oled_text', message0: 'oled.text x %1 y %2 %3 size %4 font %5',
+      args0: [{ type: 'input_value', name: 'X', check: 'Number' }, { type: 'input_value', name: 'Y', check: 'Number' },
+              { type: 'input_value', name: 'TEXT' }, { type: 'field_dropdown', name: 'SIZE', options: [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']] },
+              { type: 'field_dropdown', name: 'FONT', options: [['auto', 'auto'], ['thai', 'thai'], ['small', 'small']] }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled,
+      tooltip: 'เขียนข้อความ/ตัวเลขที่ x (0-127), y (มุมบนของตัวอักษร 0-63)\n' +
+        'auto: มีภาษาไทย = ฟอนต์ไทย สูง 20 จุด (3 บรรทัดต่อจอ), อังกฤษล้วน = ฟอนต์เล็ก สูง 8 จุด\n' +
+        'thai: ฟอนต์ไทยเสมอ (ให้ตัวเลขสูงเท่าภาษาไทย) · small: ฟอนต์เล็ก (อังกฤษเท่านั้น)' },
+    { type: 'oled_width', message0: 'oled.width %1 size %2 font %3',
+      args0: [{ type: 'input_value', name: 'TEXT' }, { type: 'field_dropdown', name: 'SIZE', options: [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']] },
+              { type: 'field_dropdown', name: 'FONT', options: [['auto', 'auto'], ['thai', 'thai'], ['small', 'small']] }],
+      inputsInline: true, output: 'Number', colour: C.oled,
+      tooltip: 'ความกว้างของข้อความเป็นจุด ใช้จัดกึ่งกลาง: x = (128 − width) ÷ 2' },
+    { type: 'oled_show', message0: 'oled.show()', previousStatement: null, nextStatement: null, colour: C.oled,
+      tooltip: 'ส่งภาพขึ้นจอทันที (ปกติจอจะอัปเดตเองตอน delay หรือจบโปรแกรม)' },
+    { type: 'oled_line', message0: 'oled.line x0 %1 y0 %2 x1 %3 y1 %4',
+      args0: ['X0', 'Y0', 'X1', 'Y1'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled },
+    { type: 'oled_rect', message0: 'oled.rect x %1 y %2 w %3 h %4 %5',
+      args0: [...['X', 'Y', 'W', 'H'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+              { type: 'field_dropdown', name: 'FILL', options: [['outline', 'false'], ['fill', 'true']] }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled },
+    { type: 'oled_circle', message0: 'oled.circle x %1 y %2 r %3 %4',
+      args0: [...['X', 'Y', 'R'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+              { type: 'field_dropdown', name: 'FILL', options: [['outline', 'false'], ['fill', 'true']] }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled },
+    { type: 'oled_pixel', message0: 'oled.pixel x %1 y %2',
+      args0: ['X', 'Y'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled },
+    { type: 'oled_bar', message0: 'oled.bar x %1 y %2 w %3 h %4 %5 %',
+      args0: ['X', 'Y', 'W', 'H', 'P'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: C.oled,
+      tooltip: 'กราฟแท่งแนวนอน เติมตามเปอร์เซ็นต์ 0-100' },
+    { type: 'math_map', message0: 'map %1 %2 %3 %4 %5',
+      args0: ['X', 'A', 'B', 'C', 'D'].map(n => ({ type: 'input_value', name: n, check: 'Number' })),
+      inputsInline: true, output: 'Number', colour: C.math, tooltip: 'map(x, inLo, inHi, outLo, outHi) แปลงช่วงค่า เช่น 0-4095 เป็น 0-100' },
+  ]);
+
+  // ---------------------------------------------------------------- Lua generator
+  const G = lua.luaGenerator, O = lua.Order;
+  const val = (b, g, name, def) => g.valueToCode(b, name, O.NONE) || def;
+  const needOutput = (g, pin) => { g.definitions_['pin_out_' + pin] = 'pinMode(' + pin + ', OUTPUT)'; };
+  const F = G.forBlock;
+
+  F.io_pin_mode = b => 'pinMode(' + b.getFieldValue('PIN') + ', ' + b.getFieldValue('MODE') + ')\n';
+  F.io_digital_write = (b, g) => { const p = b.getFieldValue('PIN'); needOutput(g, p); return 'digitalWrite(' + p + ', ' + b.getFieldValue('STATE') + ')\n'; };
+  F.io_digital_write_n = (b, g) => 'digitalWrite(' + val(b, g, 'PIN', '2') + ', ' + b.getFieldValue('STATE') + ')\n';
+  F.io_digital_toggle = (b, g) => { const p = b.getFieldValue('PIN'); needOutput(g, p); return 'digitalWrite(' + p + ', 1 - digitalRead(' + p + '))\n'; };
+  F.io_digital_read = b => ['digitalRead(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.io_digital_is_high = b => ['digitalRead(' + b.getFieldValue('PIN') + ') == 1', O.RELATIONAL];
+  F.io_analog_read = b => ['analogRead(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.io_pwm = (b, g) => 'analogWrite(' + b.getFieldValue('PIN') + ', ' + val(b, g, 'VALUE', '0') + ')\n';
+  F.io_touch_read = b => ['touchRead(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.board_led = (b, g) => { needOutput(g, 'LED_BUILTIN'); return 'digitalWrite(LED_BUILTIN, ' + b.getFieldValue('STATE') + ')\n'; };
+  F.board_boot = (b, g) => { g.definitions_['pin_boot'] = 'pinMode(0, INPUT_PULLUP)'; return ['digitalRead(0) == 0', O.RELATIONAL]; };
+  F.time_delay_ms = (b, g) => 'delay(' + val(b, g, 'MS', '0') + ')\n';
+  F.time_delay_s = (b, g) => 'delay(' + (g.valueToCode(b, 'S', O.MULTIPLICATIVE) || '0') + ' * 1000)\n';
+  F.time_millis = () => ['millis()', O.HIGH];
+  F.disp_show = (b, g) => 'show(' + g.quote_(b.getFieldValue('NAME')) + ', ' + val(b, g, 'VALUE', 'nil') + ')\n';
+  F.disp_clear = () => 'clear()\n';
+  F.ctl_forever = (b, g) => 'while true do\n' + g.statementToCode(b, 'DO') + 'end\n';
+  const q = (b, g, n, d) => g.valueToCode(b, n, O.NONE) || d;
+  F.math_round_to = (b, g) => ['round(' + q(b, g, 'X', '0') + ', ' + b.getFieldValue('N') + ')', O.HIGH];
+  F.i2c_begin = b => 'i2c.begin(' + b.getFieldValue('SDA') + ', ' + b.getFieldValue('SCL') + ')\n';
+  F.i2c_scan = () => 'i2c.scan(true)\n';
+  F.i2c_read_reg = (b, g) => ['i2c.readReg(' + q(b, g, 'ADDR', '0') + ', ' + q(b, g, 'REG', '0') + ')', O.HIGH];
+  F.i2c_write_reg = (b, g) => 'i2c.writeReg(' + ['ADDR', 'REG', 'VALUE'].map(n => q(b, g, n, '0')).join(', ') + ')\n';
+  F.sens_aht20 = b => ['aht20.' + b.getFieldValue('Q') + '()', O.HIGH];
+  F.sens_sht31 = b => ['sht31.' + b.getFieldValue('Q') + '()', O.HIGH];
+  F.sens_bme280 = b => ['bme280.' + b.getFieldValue('Q') + '()', O.HIGH];
+  F.sens_bh1750 = () => ['bh1750.lux()', O.HIGH];
+  F.sens_mpu_accel = b => ["mpu6050.accel('" + b.getFieldValue('AXIS') + "')", O.HIGH];
+  F.sens_mpu_gyro = b => ["mpu6050.gyro('" + b.getFieldValue('AXIS') + "')", O.HIGH];
+  F.sens_mpu_angle = b => ["mpu6050.angle('" + b.getFieldValue('W') + "')", O.HIGH];
+  F.sens_dht = b => ['dht.' + b.getFieldValue('Q') + '(' + b.getFieldValue('PIN') +
+    (b.getFieldValue('TYPE') === 'dht11' ? ", 'dht11'" : '') + ')', O.HIGH];
+  F.sens_soil = (b, g) => { const d = q(b, g, 'DRY', '2800'), w = q(b, g, 'WET', '1200');
+    return ['soil.moisture(' + b.getFieldValue('PIN') + (d === '2800' && w === '1200' ? '' : ', ' + d + ', ' + w) + ')', O.HIGH]; };
+  F.sens_light = b => ['light.level(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.sens_percent = (b, g) => ['sensor.percent(' + b.getFieldValue('PIN') + ', ' + q(b, g, 'A0', '0') + ', ' + q(b, g, 'A100', '4095') + ')', O.HIGH];
+  F.sens_raw = b => ['sensor.raw(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.act_tone = (b, g) => 'tone(' + b.getFieldValue('PIN') + ', ' + q(b, g, 'FREQ', '440') + ', ' + q(b, g, 'MS', '200') + ')\n';
+  F.act_notone = b => 'noTone(' + b.getFieldValue('PIN') + ')\n';
+  F.act_note = b => [b.getFieldValue('N'), O.ATOMIC];
+  F.act_relay = b => 'relay.set(' + b.getFieldValue('PIN') + ', ' + b.getFieldValue('ON') + (b.getFieldValue('LOW') === 'true' ? '' : ', false') + ')\n';
+  const motorPins = b => b.getFieldValue('IN1') + ', ' + b.getFieldValue('IN2');
+  const motorEn = b => b.getFieldValue('EN') === '-1' ? '' : ', ' + b.getFieldValue('EN');
+  F.act_motor = (b, g) => 'motor.run(' + motorPins(b) + ', ' + q(b, g, 'SPEED', '0') + motorEn(b) + ')\n';
+  F.act_motor_stop = b => 'motor.stop(' + motorPins(b) + motorEn(b) + ')\n';
+  F.act_servo = (b, g) => 'servo.write(' + b.getFieldValue('PIN') + ', ' + q(b, g, 'ANGLE', '90') + ')\n';
+  F.sens_mq_level = b => ['mq2.level(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.sens_mq_ppm = b => ["mq2.ppm(" + b.getFieldValue('PIN') + ", '" + b.getFieldValue('GAS') + "')", O.HIGH];
+  F.sens_mq_volt = b => ['mq2.voltage(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.sens_mq_cal = b => 'print(\'MQ-2 R0 =\', mq2.calibrate(' + b.getFieldValue('PIN') + '), \'kOhm (saved)\')\n';
+  F.sens_rain = (b, g) => { const d = q(b, g, 'DRY', '4095'), w = q(b, g, 'WET', '1500');
+    return ['rain.level(' + b.getFieldValue('PIN') + (d === '4095' && w === '1500' ? '' : ', ' + d + ', ' + w) + ')', O.HIGH]; };
+  F.sens_water = (b, g) => { const pw = b.getFieldValue('POWER'), e = q(b, g, 'EMPTY', '0'), f = q(b, g, 'FULL', '2000');
+    const cal = !(e === '0' && f === '2000');
+    return ['water.level(' + b.getFieldValue('PIN') + (pw !== '-1' || cal ? ', ' + (pw !== '-1' ? pw : 'nil') : '') + (cal ? ', ' + e + ', ' + f : '') + ')', O.HIGH]; };
+  F.sens_pir = b => ['pir.motion(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.sens_ds18b20 = (b, g) => { const n = q(b, g, 'N', '1');
+    return ['ds18b20.temperature(' + b.getFieldValue('PIN') + (n === '1' ? '' : ', ' + n) + ')', O.HIGH]; };
+  F.sens_ds18b20_count = b => ['ds18b20.count(' + b.getFieldValue('PIN') + ')', O.HIGH];
+  F.sens_ultrasonic = b => ['ultrasonic.distance(' + b.getFieldValue('TRIG') + ', ' + b.getFieldValue('ECHO') + ')', O.HIGH];
+  F.lcd_begin = b => 'lcd.begin(' + b.getFieldValue('SIZE') + ')\n';
+  F.lcd_clear = () => 'lcd.clear()\n';
+  F.lcd_text = (b, g) => 'lcd.text(' + q(b, g, 'COL', '0') + ', ' + q(b, g, 'ROW', '0') + ', ' + q(b, g, 'TEXT', "''") + ')\n';
+  F.lcd_backlight = b => 'lcd.backlight(' + b.getFieldValue('ON') + ')\n';
+  F.oled_begin = b => "oled.begin('" + b.getFieldValue('TYPE') + "')\n";
+  F.oled_clear = () => 'oled.clear()\n';
+  F.oled_show = () => 'oled.show()\n';
+  const sizeFont = b => {
+    const size = b.getFieldValue('SIZE'), font = b.getFieldValue('FONT');
+    return font !== 'auto' ? ', ' + size + ", '" + font + "'" : size !== '1' ? ', ' + size : '';
+  };
+  F.oled_text = (b, g) => 'oled.text(' + q(b, g, 'X', '0') + ', ' + q(b, g, 'Y', '0') + ', ' + q(b, g, 'TEXT', "''") + sizeFont(b) + ')\n';
+  F.oled_width = (b, g) => ['oled.width(' + q(b, g, 'TEXT', "''") + sizeFont(b) + ')', O.HIGH];
+  F.oled_line = (b, g) => 'oled.line(' + ['X0', 'Y0', 'X1', 'Y1'].map(n => q(b, g, n, '0')).join(', ') + ')\n';
+  F.oled_rect = (b, g) => 'oled.rect(' + ['X', 'Y', 'W', 'H'].map(n => q(b, g, n, '0')).join(', ') + (b.getFieldValue('FILL') === 'true' ? ', true' : '') + ')\n';
+  F.oled_circle = (b, g) => 'oled.circle(' + ['X', 'Y', 'R'].map(n => q(b, g, n, '0')).join(', ') + (b.getFieldValue('FILL') === 'true' ? ', true' : '') + ')\n';
+  F.oled_pixel = (b, g) => 'oled.pixel(' + q(b, g, 'X', '0') + ', ' + q(b, g, 'Y', '0') + ')\n';
+  F.oled_bar = (b, g) => 'oled.bar(' + ['X', 'Y', 'W', 'H', 'P'].map(n => q(b, g, n, '0')).join(', ') + ')\n';
+  F.math_map = (b, g) => ['map(' + ['X', 'A', 'B', 'C', 'D'].map(n => val(b, g, n, '0')).join(', ') + ')', O.HIGH];
+}
+
+// ------------------------------------------------------------------ toolbox
+const num = n => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
+const blk = (type, inputs, fields) => ({ kind: 'block', type, inputs, fields });
+const cat = (name, colour, contents) => ({ kind: 'category', name, colour, contents });
+const TOOLBOX = { kind: 'categoryToolbox', contents: [
+  cat('🔌 ขา I/O', C.io, [
+    blk('io_pin_mode'), blk('io_digital_write'), blk('io_digital_write_n', { PIN: num(2) }), blk('io_digital_toggle'), blk('io_digital_read'), blk('io_digital_is_high'),
+    blk('io_analog_read'), blk('io_pwm', { VALUE: num(128) }), blk('io_touch_read')]),
+  cat('💡 บนบอร์ด', C.board, [blk('board_led'), blk('board_boot')]),
+  cat('⏱ เวลา', C.time, [blk('time_delay_ms', { MS: num(500) }), blk('time_delay_s', { S: num(1) }), blk('time_millis')]),
+  cat('💬 แสดงผล', C.disp, [
+    blk('text_print', { TEXT: { shadow: { type: 'text', fields: { TEXT: 'hello' } } } }),
+    blk('disp_show', { VALUE: num(0) }), blk('disp_clear')]),
+  cat('🔁 ควบคุม', C.ctl, [
+    blk('ctl_forever'), blk('controls_if'), { kind: 'block', type: 'controls_if', extraState: { hasElse: true } },
+    blk('controls_repeat_ext', { TIMES: num(10) }), blk('controls_whileUntil'),
+    blk('controls_for', { FROM: num(1), TO: num(10), BY: num(1) }), blk('controls_forEach'), blk('controls_flow_statements')]),
+  cat('🔀 ตรรกะ', '#5b80a5', [blk('logic_compare'), blk('logic_operation'), blk('logic_negate'), blk('logic_boolean'), blk('logic_ternary')]),
+  cat('🔢 ตัวเลข', C.math, [
+    blk('math_number'), blk('math_arithmetic', { A: num(1), B: num(1) }), blk('math_single', { NUM: num(9) }),
+    blk('math_number_property', { NUMBER_TO_CHECK: num(0) }), blk('math_round', { NUM: num(3.1) }),
+    blk('math_modulo', { DIVIDEND: num(64), DIVISOR: num(10) }), blk('math_constrain', { VALUE: num(50), LOW: num(0), HIGH: num(100) }),
+    blk('math_random_int', { FROM: num(1), TO: num(100) }), blk('math_random_float'),
+    blk('math_map', { X: num(2048), A: num(0), B: num(4095), C: num(0), D: num(100) }), blk('math_round_to', { X: num(23.456) }, { N: '1' }), blk('math_trig', { NUM: num(45) }), blk('math_constant')]),
+  cat('🔤 ข้อความ', '#5ba58c', [
+    blk('text'), blk('text_join'), blk('text_append', { TEXT: { shadow: { type: 'text' } } }), blk('text_length'), blk('text_isEmpty'),
+    blk('text_indexOf'), blk('text_charAt'), blk('text_getSubstring'), blk('text_changeCase'), blk('text_trim'), blk('text_count'),
+    blk('text_replace'), blk('text_reverse')]),
+  cat('📋 รายการ', '#745ba5', [
+    blk('lists_create_empty'), blk('lists_create_with'), blk('lists_repeat', { NUM: num(5) }), blk('lists_length'), blk('lists_isEmpty'),
+    blk('lists_indexOf'), blk('lists_getIndex'), blk('lists_setIndex'), blk('lists_getSublist'), blk('lists_sort')]),
+  cat('🌡 เซนเซอร์', C.i2c, [
+    { kind: 'label', text: 'DHT22 / DHT11 (อุณหภูมิ ความชื้น)' },
+    blk('sens_dht', null, { PIN: '4' }), blk('sens_dht', null, { Q: 'humidity', PIN: '4' }),
+    { kind: 'label', text: 'อนาล็อก (ขา 32-39): ดิน แสง และอื่น ๆ' },
+    blk('sens_soil', { DRY: num(2800), WET: num(1200) }, { PIN: '34' }), blk('sens_light', null, { PIN: '35' }),
+    blk('sens_percent', { A0: num(0), A100: num(4095) }, { PIN: '34' }), blk('sens_raw', null, { PIN: '34' }),
+    { kind: 'label', text: 'แก๊ส MQ-2 (ผ่านตัวแบ่งแรงดัน 10k/20k)' },
+    blk('sens_mq_level', null, { PIN: '34' }), blk('sens_mq_ppm', null, { PIN: '34' }),
+    blk('sens_mq_volt', null, { PIN: '34' }), blk('sens_mq_cal', null, { PIN: '34' }),
+    { kind: 'label', text: 'ฝน และระดับน้ำ' },
+    blk('sens_rain', { DRY: num(4095), WET: num(1500) }, { PIN: '34' }),
+    blk('sens_water', { EMPTY: num(0), FULL: num(2000) }, { PIN: '35', POWER: '27' }),
+    { kind: 'label', text: 'PIR ตรวจจับการเคลื่อนไหว' },
+    blk('sens_pir', null, { PIN: '27' }),
+    { kind: 'label', text: 'DS18B20 (1-Wire, หลายตัวบนสายเดียวได้)' },
+    blk('sens_ds18b20', { N: num(1) }, { PIN: '4' }), blk('sens_ds18b20_count', null, { PIN: '4' }),
+    { kind: 'label', text: 'อัลตราโซนิก HC-SR04' },
+    blk('sens_ultrasonic', null, { TRIG: '5', ECHO: '18' }),
+    { kind: 'label', text: 'I2C: ต่อ SDA=GPIO21 SCL=GPIO22 VCC=3.3V GND' },
+    blk('i2c_scan'),
+    blk('sens_aht20'), blk('sens_aht20', null, { Q: 'humidity' }),
+    blk('sens_sht31'), blk('sens_bme280'), blk('sens_bme280', null, { Q: 'pressure' }),
+    blk('sens_bh1750'),
+    blk('sens_mpu_angle'), blk('sens_mpu_accel'), blk('sens_mpu_gyro'),
+    { kind: 'label', text: 'ขั้นสูง' },
+    blk('i2c_begin'), blk('i2c_read_reg', { ADDR: num(104), REG: num(117) }), blk('i2c_write_reg', { ADDR: num(104), REG: num(107), VALUE: num(0) })]),
+  cat('📺 จอ OLED', C.oled, [
+    { kind: 'label', text: 'x 0-127 · y 0-63 (จอ 0.91" y 0-31) · พิมพ์ภาษาไทยได้' },
+    blk('oled_begin'), blk('oled_begin', null, { TYPE: 'sh1106' }), blk('oled_begin', null, { TYPE: 'ssd1306_32' }),
+    blk('oled_clear'),
+    blk('oled_text', { X: num(0), Y: num(0), TEXT: { shadow: { type: 'text', fields: { TEXT: 'สวัสดี' } } } }),
+    blk('oled_text', { X: num(0), Y: num(20), TEXT: num(123) }, { SIZE: '2' }),
+    blk('oled_bar', { X: num(0), Y: num(50), W: num(128), H: num(12), P: num(50) }),
+    blk('oled_line', { X0: num(0), Y0: num(0), X1: num(127), Y1: num(63) }),
+    blk('oled_rect', { X: num(10), Y: num(10), W: num(40), H: num(20) }),
+    blk('oled_circle', { X: num(64), Y: num(32), R: num(10) }),
+    blk('oled_pixel', { X: num(64), Y: num(32) }),
+    blk('oled_width', { TEXT: { shadow: { type: 'text', fields: { TEXT: 'สวัสดี' } } } }),
+    blk('oled_show')]),
+  cat('🔔 เสียง / รีเลย์ / มอเตอร์', C.act, [
+    { kind: 'label', text: 'บัซเซอร์ (passive)' },
+    blk('act_tone', { FREQ: { shadow: { type: 'act_note', fields: { N: '440' } } }, MS: num(200) }, { PIN: '25' }),
+    blk('act_tone', { FREQ: num(1000), MS: num(100) }, { PIN: '25' }),
+    blk('act_notone', null, { PIN: '25' }), blk('act_note'),
+    { kind: 'label', text: 'รีเลย์' },
+    blk('act_relay', null, { PIN: '26' }), blk('act_relay', null, { PIN: '26', ON: 'false' }),
+    { kind: 'label', text: 'มอเตอร์ DC (ผ่าน L298N / L9110S / TB6612)' },
+    blk('act_motor', { SPEED: num(60) }, { IN1: '16', IN2: '17' }), blk('act_motor_stop', null, { IN1: '16', IN2: '17' }),
+    { kind: 'label', text: 'เซอร์โว SG90 / MG90S' },
+    blk('act_servo', { ANGLE: num(90) }, { PIN: '13' })]),
+  cat('🔲 จอ LCD', C.lcd, [
+    { kind: 'label', text: 'LCD 16x2/20x4 + บอร์ด I2C (PCF8574) · ตัวอักษรอังกฤษ/ตัวเลข' },
+    blk('lcd_begin'), blk('lcd_clear'),
+    blk('lcd_text', { COL: num(0), ROW: num(0), TEXT: { shadow: { type: 'text', fields: { TEXT: 'Hello' } } } }),
+    blk('lcd_text', { COL: num(0), ROW: num(1), TEXT: num(123) }),
+    blk('lcd_backlight')]),
+  { kind: 'sep' },
+  { kind: 'category', name: '📦 ตัวแปร', colour: '#a55b80', custom: 'VARIABLE' },
+  { kind: 'category', name: '⚙ ฟังก์ชัน', colour: '#995ba5', custom: 'PROCEDURE' },
+]};
+
+// ------------------------------------------------------------------ examples (Blockly JSON)
+const B = (type, fields, inputs, extra) => Object.assign({ type, fields: fields || {}, inputs: inputs || {} }, extra || {});
+const V = block => ({ block });
+const N = n => V(B('math_number', { NUM: n }));
+const T = s => V(B('text', { TEXT: s }));
+const VAR = name => ({ VAR: { name } });
+const getv = name => V(B('variables_get', VAR(name)));
+const seq = (...bs) => { for (let i = 0; i < bs.length - 1; i++) bs[i].next = { block: bs[i + 1] }; return { block: bs[0] }; };
+const forever = (...bs) => B('ctl_forever', null, { DO: seq(...bs) });
+const led = on => B('board_led', { STATE: on ? 'HIGH' : 'LOW' });
+const ifElse = (cond, thenB, elseB) => B('controls_if', null, { IF0: V(cond), DO0: seq(...thenB), ELSE: seq(...elseB) }, { extraState: { hasElse: true } });
+const set = (name, v) => B('variables_set', VAR(name), { VALUE: v });
+const program = (...bs) => ({ blocks: { languageVersion: 0, blocks: [Object.assign(seq(...bs).block, { x: 30, y: 30 })] } });
+
+// note on a block (the "?" icon) explaining what the example does / how to wire it;
+// also printed to the console when the example is loaded
+const note = (block, text, w, h) => Object.assign(block, { icons: { comment: { text, pinned: false, width: w || 300, height: h || 90 } } });
+function exampleNotes(state) {
+  const out = [];
+  const walk = b => {
+    if (!b || typeof b !== 'object') return;
+    if (b.icons && b.icons.comment) out.push(b.icons.comment.text);
+    for (const k in b) if (k !== 'icons') walk(b[k]);
+  };
+  walk(state);
+  return out;
+}
+// several top-level stacks: [[block, x, y], ...]
+const programN = (...stacks) => ({ blocks: { languageVersion: 0, blocks: stacks.map(([b, x, y]) => Object.assign(b, { x, y })) } });
+const ms = n => B('time_delay_ms', null, { MS: N(n) });
+const showv = (name, v) => B('disp_show', { NAME: name }, { VALUE: v });
+const say = s => B('text_print', null, { TEXT: typeof s === 'string' ? T(s) : s });
+const join = (...parts) => V(B('text_join', null,
+  Object.fromEntries(parts.map((p, i) => ['ADD' + i, typeof p === 'string' ? T(p) : p])), { extraState: { itemCount: parts.length } }));
+const arith = (op, a, b) => V(B('math_arithmetic', { OP: op }, { A: a, B: b }));
+const cmp = (op, a, b) => B('logic_compare', { OP: op }, { A: a, B: b });
+const ifThen = (cond, ...then) => B('controls_if', null, { IF0: V(cond), DO0: seq(...then) });
+const pinW = (pin, hi) => B('io_digital_write', { PIN: String(pin), STATE: hi ? 'HIGH' : 'LOW' });
+const change = (name, d) => B('math_change', VAR(name), { DELTA: N(d) });
+const waitRelease = () => B('controls_whileUntil', { MODE: 'WHILE' }, { BOOL: V(B('board_boot')), DO: seq(ms(10)) });
+const analog34 = () => V(B('io_analog_read', { PIN: '34' }));
+const repeat = (n, ...body) => B('controls_repeat_ext', null, { TIMES: typeof n === 'number' ? N(n) : n, DO: seq(...body) });
+const callP = (name, args) => B('procedures_callnoreturn', null,
+  Object.fromEntries(args.map((a, i) => ['ARG' + i, typeof a === 'number' ? N(a) : a])),
+  { extraState: { name, params: ['times', 'ms'].slice(0, args.length) } });
+
+const G_BOARD = 'บนบอร์ด (ไม่ต้องต่ออะไรเพิ่ม)', G_EXT = 'ต่ออุปกรณ์เพิ่ม', G_I2C = 'เซนเซอร์ I2C / จอ OLED';
+const EXAMPLES = [
+  // ---------------------------------------------------------------- on-board only
+  ['ไฟกะพริบ', program(note(forever(led(1), B('time_delay_s', null, { S: N(0.5) }), led(0), B('time_delay_s', null, { S: N(0.5) })),
+    'LED สีฟ้าบนบอร์ด (GPIO2) ติด 0.5 วินาที ดับ 0.5 วินาที วนไปเรื่อย ๆ')), G_BOARD],
+  ['กดปุ่ม BOOT แล้วไฟติด', program(note(forever(ifElse(B('board_boot'), [led(1)], [led(0)]), ms(20)),
+    'กดปุ่ม BOOT ค้างไว้ = ไฟติด ปล่อย = ไฟดับ')), G_BOARD],
+  ['กด BOOT สลับไฟเปิด/ปิด', program(
+    note(set('on', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'กด BOOT หนึ่งครั้ง = สลับไฟเปิด/ปิด\nรอให้ปล่อยปุ่มก่อน ไม่งั้นไฟจะสลับรัว ๆ ตอนกดค้าง'),
+    forever(
+      ifThen(B('board_boot'),
+        set('on', V(B('logic_negate', null, { BOOL: getv('on') }))),
+        ifElse(B('variables_get', VAR('on')), [led(1)], [led(0)]),
+        showv('led_on', getv('on')),
+        waitRelease()),
+      ms(20))), G_BOARD],
+  ['นับจำนวนครั้งที่กดปุ่ม', program(
+    note(set('count', N(0)), 'ทุกครั้งที่กด BOOT ตัวนับเพิ่ม 1 ดูค่าที่การ์ด "presses"'),
+    showv('presses', getv('count')),
+    forever(
+      ifThen(B('board_boot'),
+        change('count', 1),
+        showv('presses', getv('count')),
+        say(join('pressed ', getv('count'), ' times')),
+        waitRelease()),
+      ms(20))), G_BOARD],
+  ['ไฟกะพริบ SOS (ใช้ฟังก์ชัน)', programN(
+    [note(B('procedures_defnoreturn', { NAME: 'blink' }, {
+      STACK: seq(repeat(getv('times'), led(1), B('time_delay_ms', null, { MS: getv('ms') }), led(0), B('time_delay_ms', null, { MS: getv('ms') }))),
+    }, { extraState: { params: [{ name: 'times' }, { name: 'ms' }] } }),
+      'ฟังก์ชัน blink(times, ms): กะพริบ times ครั้ง ติด/ดับครั้งละ ms มิลลิวินาที\nสร้างฟังก์ชันเองได้ที่หมวด "ฟังก์ชัน"', 320, 80), 30, 30],
+    [note(forever(callP('blink', [3, 150]), callP('blink', [3, 450]), callP('blink', [3, 150]), ms(1500)),
+      'SOS ในรหัสมอร์ส: สั้น 3 ยาว 3 สั้น 3', 260, 50), 30, 440]), G_BOARD],
+  ['ไฟหายใจ (PWM + sin)', program(note(forever(
+    B('controls_for', VAR('deg'), { FROM: N(0), TO: N(360), BY: N(4), DO: seq(
+      B('io_pwm', { PIN: '2' }, { VALUE: V(B('math_round', { OP: 'ROUND' }, { NUM: arith('ADD', N(127),
+        arith('MULTIPLY', N(127), V(B('math_trig', { OP: 'SIN' }, { NUM: arith('MINUS', getv('deg'), N(90)) })))) })) }),
+      ms(15)) })),
+    'ไฟค่อย ๆ สว่างแล้วค่อย ๆ หรี่ เหมือนหายใจ\nความสว่าง = 127 + 127 × sin(องศา − 90)')), G_BOARD],
+  ['ทอยลูกเต๋า (กด BOOT)', program(
+    note(say('press BOOT to roll the dice'), 'กด BOOT = สุ่มเลข 1-6 แล้วไฟกะพริบตามจำนวนแต้ม'),
+    forever(
+      ifThen(B('board_boot'),
+        set('dice', V(B('math_random_int', null, { FROM: N(1), TO: N(6) }))),
+        showv('dice', getv('dice')),
+        say(join('you rolled ', getv('dice'))),
+        repeat(getv('dice'), led(1), ms(200), led(0), ms(200)),
+        waitRelease()),
+      ms(20))), G_BOARD],
+  ['นับถอยหลัง 10 วินาที', program(
+    note(B('controls_for', VAR('s'), { FROM: N(10), TO: N(1), BY: N(1), DO: seq(
+      showv('seconds_left', getv('s')), say(getv('s')), B('time_delay_s', null, { S: N(1) })) }),
+      'นับ 10 ถึง 1 ทีละวินาที หมดเวลาแล้วไฟติดค้าง และโปรแกรมจบเอง'),
+    showv('seconds_left', N(0)),
+    led(1),
+    say('time is up!')), G_BOARD],
+  ['เกมวัดความไว (กด BOOT ให้เร็ว)', program(
+    note(say('wait for the LED, then press BOOT as fast as you can'),
+      'ไฟจะติดตอนสุ่ม 1-4 วินาที เห็นไฟแล้วกด BOOT ให้เร็วที่สุด\nเวลาตอบสนองแสดงที่การ์ด "reaction_ms"'),
+    forever(
+      led(0),
+      B('time_delay_ms', null, { MS: V(B('math_random_int', null, { FROM: N(1000), TO: N(4000) })) }),
+      led(1),
+      set('start', V(B('time_millis'))),
+      B('controls_whileUntil', { MODE: 'UNTIL' }, { BOOL: V(B('board_boot')), DO: seq(ms(1)) }),
+      set('reaction', arith('MINUS', V(B('time_millis')), getv('start'))),
+      led(0),
+      showv('reaction_ms', getv('reaction')),
+      say(join('reaction: ', getv('reaction'), ' ms')),
+      waitRelease(),
+      ms(1000))), G_BOARD],
+
+  // ---------------------------------------------------------------- external parts
+  ['อ่านอนาล็อกแสดงกราฟ (GPIO34)', program(note(forever(
+    set('value', analog34()),
+    showv('analog34', getv('value')),
+    showv('volts', V(B('math_map', null, { X: getv('value'), A: N(0), B: N(4095), C: N(0), D: N(3.3) }))),
+    ms(100)), 'ต่อตัวต้านทานปรับค่า (10k): ขากลาง → GPIO34, ขาข้าง → 3.3V และ GND\nหมุนแล้วดูกราฟที่การ์ด')), G_EXT],
+  ['หมุนปรับความสว่างไฟ (GPIO34 → LED)', program(note(forever(
+    set('value', analog34()),
+    set('bright', V(B('math_round', { OP: 'ROUND' }, { NUM: V(B('math_map', null, { X: getv('value'), A: N(0), B: N(4095), C: N(0), D: N(255) })) }))),
+    B('io_pwm', { PIN: '2' }, { VALUE: getv('bright') }),
+    showv('pot', getv('value')),
+    showv('brightness', getv('bright')),
+    ms(20)), 'ตัวต้านทานปรับค่าที่ GPIO34 (แบบเดียวกับตัวอย่างกราฟ)\nหมุนแล้ว LED บนบอร์ดสว่าง/หรี่ตาม (map 0-4095 → 0-255)')), G_EXT],
+  ['ลดสัญญาณรบกวน (ค่าเฉลี่ย)', program(
+    note(set('avg', analog34()),
+      'ค่าดิบจากเซนเซอร์มักแกว่ง เฉลี่ยแบบเลื่อน: avg = avg + (raw − avg) × 0.1\nเทียบกราฟ "raw" กับ "smooth" (ต่อเซนเซอร์ที่ GPIO34)', 330, 90),
+    forever(
+      set('raw', analog34()),
+      set('avg', arith('ADD', getv('avg'), arith('MULTIPLY', arith('MINUS', getv('raw'), getv('avg')), N(0.1)))),
+      showv('raw', getv('raw')),
+      showv('smooth', V(B('math_round', { OP: 'ROUND' }, { NUM: getv('avg') }))),
+      ms(20))), G_EXT],
+  ['แจ้งเตือนเมื่อค่าเกิน (มีช่วงกันสั่น)', program(
+    note(set('alarm', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'ค่าที่ GPIO34 เกิน 3000 = เตือน (ไฟติด) ต้องลดต่ำกว่า 2500 ถึงหายเตือน\nช่วงห่างนี้ (hysteresis) กันไฟกะพริบรัวตอนค่าอยู่ใกล้เส้น', 340, 90),
+    forever(
+      set('value', analog34()),
+      showv('value', getv('value')),
+      B('controls_if', null, {
+        IF0: V(cmp('GT', getv('value'), N(3000))), DO0: seq(set('alarm', V(B('logic_boolean', { BOOL: 'TRUE' })))),
+        IF1: V(cmp('LT', getv('value'), N(2500))), DO1: seq(set('alarm', V(B('logic_boolean', { BOOL: 'FALSE' })))),
+      }, { extraState: { elseIfCount: 1 } }),
+      ifElse(B('variables_get', VAR('alarm')),
+        [led(1), showv('status', T('ALARM'))], [led(0), showv('status', T('OK'))]),
+      ms(100))), G_EXT],
+  ['รีเลย์ตั้งเวลา เปิด/ปิด (GPIO26)', program(
+    note(set('on_s', N(5)),
+      'รีเลย์ที่ GPIO26: เปิด on_s วินาที ปิด off_s วินาที วนไป\nรีเลย์ติด/ดับกลับด้าน: เปลี่ยนบล็อก relay เป็น HIGH-trigger', 340, 90),
+    set('off_s', N(10)),
+    set('cycles', N(0)),
+    forever(
+      B('act_relay', { PIN: '26', ON: 'true' }), showv('relay', T('ON')), B('time_delay_s', null, { S: getv('on_s') }),
+      B('act_relay', { PIN: '26', ON: 'false' }), showv('relay', T('OFF')),
+      change('cycles', 1), showv('cycles', getv('cycles')),
+      B('time_delay_s', null, { S: getv('off_s') }))), G_EXT],
+  ['ไฟวิ่ง 4 ดวง (GPIO16-19)', program(
+    note(set('pins', V(B('lists_create_with', null, { ADD0: N(16), ADD1: N(17), ADD2: N(18), ADD3: N(19) }, { extraState: { itemCount: 4 } }))),
+      'ต่อ LED + ตัวต้านทาน 220Ω ที่ GPIO16, 17, 18, 19 (ขาสั้นลง GND)\nใช้รายการ (list) เก็บเลขขา แล้ววนทีละดวง', 330, 80),
+    forever(
+      B('controls_forEach', VAR('p'), { LIST: getv('pins'), DO: seq(
+        B('io_digital_write_n', { STATE: 'HIGH' }, { PIN: getv('p') }), ms(150),
+        B('io_digital_write_n', { STATE: 'LOW' }, { PIN: getv('p') })) }))), G_EXT],
+  ['อุณหภูมิ/ความชื้น DHT22 (GPIO4)', program(note(forever(
+    set('t', V(B('sens_dht', { Q: 'temperature', PIN: '4' }))),
+    set('h', V(B('sens_dht', { Q: 'humidity', PIN: '4' }))),
+    showv('temp_C', getv('t')),
+    showv('humidity', getv('h')),
+    ifElse(cmp('GT', getv('t'), N(30)), [led(1)], [led(0)]),
+    B('time_delay_s', null, { S: N(2) })),
+    'DHT22: VCC → 3.3V, GND → GND, DATA → GPIO4 (ตัวเปล่า 4 ขา: ต่อ 10k จาก DATA ไป VCC)\n' +
+    'ร้อนเกิน 30°C ไฟบนบอร์ดติด · ใช้ DHT11: เปลี่ยนตัวเลือกในบล็อก dht เป็น DHT11', 360, 80)), G_EXT],
+  ['ความชื้นในดิน (GPIO34)', program(note(forever(
+    set('m', V(B('sens_soil', { PIN: '34' }, { DRY: N(2800), WET: N(1200) }))),
+    showv('soil_%', getv('m')),
+    showv('raw', V(B('sens_raw', { PIN: '34' }))),
+    ifElse(cmp('LT', getv('m'), N(30)), [led(1)], [led(0)]),
+    B('time_delay_s', null, { S: N(1) })),
+    'เซนเซอร์ความชื้นดิน: AOUT → GPIO34, VCC → 3.3V, GND → GND\nดินแห้งกว่า 30% = ไฟบนบอร์ดติด (ถึงเวลารดน้ำ)\nค่าไม่ตรง: ใช้ตัวอย่าง "ปรับเทียบ" แล้วแก้ค่า dry/wet ในบล็อก', 340, 80)), G_EXT],
+  ['ปรับเทียบเซนเซอร์ความชื้นดิน', program(note(forever(
+    showv('raw', V(B('sens_raw', { PIN: '34' }))),
+    ms(300)),
+    '1) ถือเซนเซอร์ไว้ในอากาศ จดค่า raw = ค่า dry\n2) จุ่มเซนเซอร์ในน้ำถึงขีด จดค่า raw = ค่า wet\n3) ใส่ 2 ค่านี้ในบล็อก soil.moisture (dry / wet)', 340, 80)), G_EXT],
+  ['รดน้ำต้นไม้อัตโนมัติ (ปั๊มผ่านรีเลย์ GPIO26)', program(
+    note(set('pumping', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'ดินแห้งกว่า 30% → เปิดปั๊ม จนชื้นถึง 60% หรือครบ 10 วินาที (กันน้ำท่วมถ้าเซนเซอร์หลุด)\n' +
+      'แล้วพัก 30 วินาทีให้น้ำซึม · เซนเซอร์ดิน GPIO34, รีเลย์ปั๊ม GPIO26 (กดหยุดโปรแกรม = ปั๊มปิดเอง)', 380, 80),
+    set('start', N(0)),
+    forever(
+      set('m', V(B('sens_soil', { PIN: '34' }, { DRY: N(2800), WET: N(1200) }))),
+      showv('soil_%', getv('m')),
+      B('controls_if', null, {
+        IF0: V(B('logic_operation', { OP: 'AND' }, { A: V(B('logic_negate', null, { BOOL: getv('pumping') })), B: V(cmp('LT', getv('m'), N(30))) })),
+        DO0: seq(set('pumping', V(B('logic_boolean', { BOOL: 'TRUE' }))), set('start', V(B('time_millis'))),
+          B('act_relay', { PIN: '26', ON: 'true' }), showv('pump', T('ON')), say(join('dry (', getv('m'), '%) - pump on'))),
+        IF1: V(B('logic_operation', { OP: 'AND' }, { A: getv('pumping'), B: V(B('logic_operation', { OP: 'OR' }, {
+          A: V(cmp('GTE', getv('m'), N(60))), B: V(cmp('GT', arith('MINUS', V(B('time_millis')), getv('start')), N(10000))) })) })),
+        DO1: seq(set('pumping', V(B('logic_boolean', { BOOL: 'FALSE' }))), B('act_relay', { PIN: '26', ON: 'false' }), showv('pump', T('soaking')),
+          say(join('pump off at ', getv('m'), '% - waiting 30 s')), B('time_delay_s', null, { S: N(30) }), showv('pump', T('OFF'))),
+      }, { extraState: { elseIfCount: 1 } }),
+      ms(500))), G_EXT],
+  ['ไฟกลางคืนอัตโนมัติ (LDR GPIO35)', program(note(forever(
+    set('light', V(B('sens_light', { PIN: '35' }))),
+    showv('light_%', getv('light')),
+    ifElse(cmp('LT', getv('light'), N(20)), [led(1)], [led(0)]),
+    ms(200)),
+    'โมดูล LDR: AO → GPIO35, VCC → 3.3V, GND\nมืดกว่า 20% = ไฟบนบอร์ดติด (ลองเอามือบังเซนเซอร์)', 330, 60)), G_EXT],
+  ['เล่นเพลงด้วยบัซเซอร์ (GPIO25)', program(
+    note(set('melody', V(B('lists_create_with', null, Object.fromEntries(
+      ['262', '262', '392', '392', '440', '440', '392', '0', '349', '349', '330', '330', '294', '294', '262'].map((f, i) => ['ADD' + i, V(B('act_note', { N: f }))])),
+      { extraState: { itemCount: 15 } }))),
+      'บัซเซอร์แบบ passive: + → GPIO25, − → GND\nเพลง "ระยิบระยับ" (Twinkle Twinkle) เก็บโน้ตเป็นรายการ แล้วเล่นทีละตัว', 330, 70),
+    B('controls_forEach', VAR('f'), { LIST: getv('melody'), DO: seq(
+      B('act_tone', { PIN: '25' }, { FREQ: getv('f'), MS: N(350) }), ms(50)) })), G_EXT],
+  ['สัญญาณกันขโมย (PIR + บัซเซอร์)', program(note(forever(
+    ifThen(B('sens_pir', { PIN: '27' }),
+      say('motion detected!'),
+      repeat(3, B('act_tone', { PIN: '25' }, { FREQ: N(2000), MS: N(150) }), B('act_tone', { PIN: '25' }, { FREQ: N(1000), MS: N(150) })),
+      B('time_delay_s', null, { S: N(2) })),
+    ms(50)),
+    'PIR OUT → GPIO27, บัซเซอร์ (passive) + → GPIO25\nมีการเคลื่อนไหว = ไซเรนดัง แล้วพัก 2 วินาที', 330, 60)), G_EXT],
+  ['รีเลย์: กด BOOT สลับเปิด/ปิด', program(
+    note(set('on', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'โมดูลรีเลย์: IN → GPIO26, VCC → 5V, GND → GND · กด BOOT = สลับเปิด/ปิด\n' +
+      'ต่อเครื่องใช้ไฟฟ้า 220V ที่ขั้ว COM/NO ต้องระวังไฟดูด ให้ผู้มีความรู้เป็นคนต่อ', 360, 70),
+    B('act_relay', { PIN: '26', ON: 'false' }),
+    forever(
+      ifThen(B('board_boot'),
+        set('on', V(B('logic_negate', null, { BOOL: getv('on') }))),
+        ifElse(B('variables_get', VAR('on')), [B('act_relay', { PIN: '26', ON: 'true' }), showv('relay', T('ON'))],
+          [B('act_relay', { PIN: '26', ON: 'false' }), showv('relay', T('OFF'))]),
+        waitRelease()),
+      ms(20))), G_EXT],
+  ['มอเตอร์ DC: เร่ง-หมุนกลับ (GPIO16/17)', program(note(forever(
+    B('controls_for', VAR('s'), { FROM: N(0), TO: N(100), BY: N(5), DO: seq(
+      B('act_motor', { IN1: '16', IN2: '17' }, { SPEED: getv('s') }), showv('speed', getv('s')), ms(100)) }),
+    B('time_delay_s', null, { S: N(1) }),
+    B('act_motor_stop', { IN1: '16', IN2: '17' }), showv('speed', N(0)), B('time_delay_s', null, { S: N(1) }),
+    B('act_motor', { IN1: '16', IN2: '17' }, { SPEED: N(-70) }), showv('speed', N(-70)), B('time_delay_s', null, { S: N(2) }),
+    B('act_motor_stop', { IN1: '16', IN2: '17' }), showv('speed', N(0)), B('time_delay_s', null, { S: N(1) })),
+    'บอร์ดขับ L9110S / DRV8833 (หรือ L298N ที่เสียบจัมเปอร์ ENA): IN1 → GPIO16, IN2 → GPIO17, GND ร่วมกับ ESP32\n' +
+    'ไฟมอเตอร์ต่อเข้าบอร์ดขับ (อย่าดึงจากขา 3.3V) · เร่ง 0→100% แล้วหยุด หมุนกลับ 70% · กดหยุด = มอเตอร์หยุด', 380, 80)), G_EXT],
+  ['หมุนปุ่มคุมความเร็วมอเตอร์ (GPIO34)', program(note(forever(
+    set('speed', V(B('math_round_to', { N: '0' }, { X: V(B('math_map', null, { X: V(B('sens_raw', { PIN: '34' })), A: N(0), B: N(4095), C: N(-100), D: N(100) })) }))),
+    ifThen(cmp('LT', V(B('math_single', { OP: 'ABS' }, { NUM: getv('speed') })), N(15)), set('speed', N(0))),
+    B('act_motor', { IN1: '16', IN2: '17' }, { SPEED: getv('speed') }),
+    showv('speed', getv('speed')),
+    ms(50)),
+    'ตัวต้านทานปรับค่า ขากลาง → GPIO34 · มอเตอร์ผ่านบอร์ดขับ IN1 16, IN2 17\nหมุนซ้าย = ถอยหลัง, ตรงกลาง = หยุด (เว้นช่วง ±15%), หมุนขวา = เดินหน้า', 360, 70)), G_EXT],
+  ['พัดลมอัตโนมัติตามอุณหภูมิ (DHT22 + มอเตอร์)', program(note(forever(
+    set('t', V(B('sens_dht', { Q: 'temperature', PIN: '4' }))),
+    showv('temp_C', getv('t')),
+    ifElse(cmp('LT', getv('t'), N(28)),
+      [B('act_motor_stop', { IN1: '16', IN2: '17' }), showv('fan_%', N(0))],
+      [set('fan', V(B('math_constrain', null, { VALUE: V(B('math_round_to', { N: '0' }, { X: V(B('math_map', null, { X: getv('t'), A: N(28), B: N(35), C: N(40), D: N(100) })) })), LOW: N(40), HIGH: N(100) }))),
+       B('act_motor', { IN1: '16', IN2: '17' }, { SPEED: getv('fan') }), showv('fan_%', getv('fan'))]),
+    B('time_delay_s', null, { S: N(2) })),
+    'DHT22 → GPIO4 · พัดลม (มอเตอร์ DC) ผ่านบอร์ดขับ IN1 16, IN2 17\nต่ำกว่า 28°C พัดลมหยุด · 28-35°C เร่ง 40-100% ตามความร้อน', 360, 70)), G_EXT],
+  ['เซอร์โวกวาด 0-180° (GPIO13)', program(note(forever(
+    B('controls_for', VAR('a'), { FROM: N(0), TO: N(180), BY: N(2), DO: seq(B('act_servo', { PIN: '13' }, { ANGLE: getv('a') }), ms(15)) }),
+    B('controls_for', VAR('a'), { FROM: N(180), TO: N(0), BY: N(2), DO: seq(B('act_servo', { PIN: '13' }, { ANGLE: getv('a') }), ms(15)) })),
+    'เซอร์โว SG90: สายส้ม → GPIO13, แดง → 5V (VIN), น้ำตาล → GND\nอย่าเลี้ยงเซอร์โวด้วย 3.3V — บอร์ดอาจรีเซ็ตเพราะไฟตก', 330, 60)), G_EXT],
+  ['หมุนปุ่มคุมเซอร์โว (GPIO34 → GPIO13)', program(note(forever(
+    set('angle', V(B('math_round_to', { N: '0' }, { X: V(B('math_map', null, { X: V(B('sens_raw', { PIN: '34' })), A: N(0), B: N(4095), C: N(0), D: N(180) })) }))),
+    B('act_servo', { PIN: '13' }, { ANGLE: getv('angle') }),
+    showv('angle', getv('angle')),
+    ms(20)),
+    'ตัวต้านทานปรับค่า: ขากลาง → GPIO34 · เซอร์โว → GPIO13\nหมุนปุ่ม = เซอร์โวหมุนตาม (0-4095 → 0-180°)', 330, 60)), G_EXT],
+  ['เตือนแก๊สรั่ว/ควัน MQ-2 (GPIO34)', program(note(forever(
+    set('gas', V(B('sens_mq_level', { PIN: '34' }))),
+    showv('gas_%', getv('gas')),
+    showv('AO_volt', V(B('sens_mq_volt', { PIN: '34' }))),
+    ifElse(cmp('GT', getv('gas'), N(40)),
+      [led(1), showv('status', T('GAS!')), repeat(2, B('act_tone', { PIN: '25' }, { FREQ: N(2500), MS: N(120) }), ms(80))],
+      [led(0), showv('status', T('OK'))]),
+    ms(200)),
+    'MQ-2: VCC → 5V, GND, AO → 10k → GPIO34 → 20k → GND (ตัวแบ่งแรงดัน)\n' +
+    'บัซเซอร์ → GPIO25 · แก๊สเกิน 40% = ไฟติด + เสียงเตือน · อุ่นเซนเซอร์ 1-3 นาทีก่อน\n' +
+    'ใช้เพื่อการเรียนรู้ ไม่ใช่เครื่องตรวจแก๊สที่ได้มาตรฐาน', 380, 90)), G_EXT],
+  ['ปรับเทียบ MQ-2 ในอากาศสะอาด', program(
+    note(say('MQ-2 warming up 120 s - keep it in clean air'),
+      'วางเซนเซอร์ในอากาศสะอาด (ไม่มีแก๊ส/ควัน/แอลกอฮอล์) ต่อไฟทิ้งไว้\n' +
+      'โปรแกรมรอ 2 นาทีให้อุ่น แล้ววัด 5 วินาที บันทึกค่า R0 ไว้บนบอร์ด (ทำครั้งเดียว)\nเซนเซอร์ใหม่: อุ่นครั้งแรก 24 ชม. ค่าจะแม่นขึ้น', 380, 90),
+    B('controls_for', VAR('s'), { FROM: N(120), TO: N(1), BY: N(1), DO: seq(
+      showv('warm_up_s', getv('s')), showv('AO_volt', V(B('sens_mq_volt', { PIN: '34' }))), B('time_delay_s', null, { S: N(1) })) }),
+    showv('warm_up_s', N(0)),
+    B('sens_mq_cal', { PIN: '34' }),
+    say('done - you can now use mq2.ppm')), G_EXT],
+  ['วัดแก๊สเป็น ppm (MQ-2)', program(note(forever(
+    showv('LPG_ppm', V(B('sens_mq_ppm', { PIN: '34', GAS: 'lpg' }))),
+    showv('CO_ppm', V(B('sens_mq_ppm', { PIN: '34', GAS: 'co' }))),
+    showv('alcohol_ppm', V(B('sens_mq_ppm', { PIN: '34', GAS: 'alcohol' }))),
+    B('time_delay_s', null, { S: N(1) })),
+    'ต้องรัน "ปรับเทียบ MQ-2 ในอากาศสะอาด" ก่อน 1 ครั้ง\nppm เป็นค่าประมาณจากกราฟ datasheet (MQ-2 ไวต่อหลายแก๊สพร้อมกัน แยกชนิดไม่ได้จริง)', 380, 70)), G_EXT],
+  ['เซนเซอร์น้ำฝน (GPIO34)', program(
+    note(set('raining', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'บอร์ดเซนเซอร์ฝน FC-37 / YL-83: AO → GPIO34, VCC → 3.3V, GND → GND\n' +
+      'เปียกเกิน 30%% = ฝนตก (ไฟติด) แห้งต่ำกว่า 10%% = ฝนหยุด · ลองหยดน้ำบนแผ่นเซนเซอร์\n' +
+      'ปรับค่า dry/wet ในบล็อก rain.level ให้ตรงกับเซนเซอร์ตัวเอง', 360, 90),
+    forever(
+      set('wet', V(B('sens_rain', { PIN: '34' }, { DRY: N(4095), WET: N(1500) }))),
+      showv('wet_%', getv('wet')),
+      B('controls_if', null, {
+        IF0: V(B('logic_operation', { OP: 'AND' }, { A: V(B('logic_negate', null, { BOOL: getv('raining') })), B: V(cmp('GT', getv('wet'), N(30))) })),
+        DO0: seq(set('raining', V(B('logic_boolean', { BOOL: 'TRUE' }))), say('rain started')),
+        IF1: V(B('logic_operation', { OP: 'AND' }, { A: getv('raining'), B: V(cmp('LT', getv('wet'), N(10))) })),
+        DO1: seq(set('raining', V(B('logic_boolean', { BOOL: 'FALSE' }))), say('rain stopped')),
+      }, { extraState: { elseIfCount: 1 } }),
+      ifElse(B('variables_get', VAR('raining')), [led(1), showv('rain', T('YES'))], [led(0), showv('rain', T('no'))]),
+      ms(200))), G_EXT],
+  ['ปิดหน้าต่างอัตโนมัติเมื่อฝนตก (เซอร์โว)', program(
+    note(set('closed', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'เซนเซอร์ฝน AO → GPIO34 · เซอร์โว SG90 → GPIO13 (สายแดง → 5V)\n' +
+      'ฝนตก (เปียกเกิน 30%%) → เซอร์โวหมุนไป 90° (ปิด) · ฝนหยุดและแห้งต่ำกว่า 10%% → กลับ 0° (เปิด)\n' +
+      'ช่วงห่าง 10-30%% กันหน้าต่างขยับไปมาตอนฝนปรอย', 380, 90),
+    B('act_servo', { PIN: '13' }, { ANGLE: N(0) }),
+    forever(
+      set('wet', V(B('sens_rain', { PIN: '34' }, { DRY: N(4095), WET: N(1500) }))),
+      showv('wet_%', getv('wet')),
+      B('controls_if', null, {
+        IF0: V(B('logic_operation', { OP: 'AND' }, { A: V(B('logic_negate', null, { BOOL: getv('closed') })), B: V(cmp('GT', getv('wet'), N(30))) })),
+        DO0: seq(set('closed', V(B('logic_boolean', { BOOL: 'TRUE' }))), B('act_servo', { PIN: '13' }, { ANGLE: N(90) }), showv('window', T('CLOSED')), say('rain - closing window')),
+        IF1: V(B('logic_operation', { OP: 'AND' }, { A: getv('closed'), B: V(cmp('LT', getv('wet'), N(10))) })),
+        DO1: seq(set('closed', V(B('logic_boolean', { BOOL: 'FALSE' }))), B('act_servo', { PIN: '13' }, { ANGLE: N(0) }), showv('window', T('OPEN')), say('dry - opening window')),
+      }, { extraState: { elseIfCount: 1 } }),
+      ms(500))), G_EXT],
+  ['ระดับน้ำในถัง + เตือนน้ำใกล้หมด', program(note(forever(
+    set('lv', V(B('sens_water', { PIN: '35', POWER: '27' }, { EMPTY: N(0), FULL: N(2000) }))),
+    showv('water_%', getv('lv')),
+    ifElse(cmp('LT', getv('lv'), N(20)),
+      [led(1), showv('status', T('LOW!')), B('act_tone', { PIN: '25' }, { FREQ: N(1800), MS: N(300) })],
+      [led(0), showv('status', T('OK'))]),
+    B('time_delay_s', null, { S: N(2) })),
+    'แผ่นเซนเซอร์ระดับน้ำ: S → GPIO35, + → GPIO27 (ไฟจ่ายเฉพาะตอนวัด กันแผ่นผุ), - → GND\n' +
+    'บัซเซอร์ passive → GPIO25 · น้ำต่ำกว่า 20%% = ไฟติด + เสียงเตือน\n' +
+    'วัดค่า empty/full ของแผ่นตัวเองด้วย sensor.raw แล้วแก้ในบล็อก (ค่าเริ่มต้น 0 / 2000)', 380, 90)), G_EXT],
+  ['เติมน้ำถังอัตโนมัติ (ปั๊ม + ระดับน้ำ)', program(
+    note(set('pumping', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+      'แผ่นระดับน้ำ S → GPIO35, + → GPIO27 · ปั๊มผ่านรีเลย์ GPIO26\n' +
+      'น้ำต่ำกว่า 25%% → เปิดปั๊ม จนถึง 85%%\n' +
+      'กันน้ำล้น: ถ้าปั๊มเปิดครบ 60 วินาทีแล้วระดับน้ำยังไม่ถึง 85%% (แผ่นเซนเซอร์เสีย/หลุด หรือถังรั่ว/ปั๊มไม่ดูด)\n' +
+      'โปรแกรมจะปิดปั๊มและ "ล็อก" ไม่เปิดอีก จนกว่าจะกดรันใหม่ · กดหยุด = ปั๊มปิดเอง', 400, 110),
+    set('fault', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+    set('start', N(0)),
+    forever(
+      set('lv', V(B('sens_water', { PIN: '35', POWER: '27' }, { EMPTY: N(0), FULL: N(2000) }))),
+      showv('water_%', getv('lv')),
+      B('controls_if', null, {
+        IF0: V(B('logic_operation', { OP: 'AND' }, { A: V(B('logic_negate', null, { BOOL: getv('fault') })),
+          B: V(B('logic_operation', { OP: 'AND' }, { A: V(B('logic_negate', null, { BOOL: getv('pumping') })), B: V(cmp('LT', getv('lv'), N(25))) })) })),
+        DO0: seq(set('pumping', V(B('logic_boolean', { BOOL: 'TRUE' }))), set('start', V(B('time_millis'))),
+          B('act_relay', { PIN: '26', ON: 'true' }), showv('pump', T('ON')), say(join('low (', getv('lv'), '%) - pump on'))),
+        IF1: V(B('logic_operation', { OP: 'AND' }, { A: getv('pumping'), B: V(B('logic_operation', { OP: 'OR' }, {
+          A: V(cmp('GTE', getv('lv'), N(85))), B: V(cmp('GT', arith('MINUS', V(B('time_millis')), getv('start')), N(60000))) })) })),
+        DO1: seq(set('pumping', V(B('logic_boolean', { BOOL: 'FALSE' }))), B('act_relay', { PIN: '26', ON: 'false' }),
+          ifElse(cmp('LT', getv('lv'), N(85)),
+            [set('fault', V(B('logic_boolean', { BOOL: 'TRUE' }))), showv('pump', T('FAULT')),
+             say(join('pump ran 60 s but level is only ', getv('lv'), '% - locked off, check sensor / tank / pump'))],
+            [showv('pump', T('OFF')), say(join('full at ', getv('lv'), '% - pump off'))])),
+      }, { extraState: { elseIfCount: 1 } }),
+      B('time_delay_s', null, { S: N(1) }))), G_EXT],
+  ['ตรวจจับการเคลื่อนไหว PIR (GPIO27)', program(
+    note(set('count', N(0)),
+      'PIR (HC-SR501): VCC → 5V, GND → GND, OUT → GPIO27 (AM312 ใช้ไฟ 3.3V)\n' +
+      'มีคนขยับ = ไฟบนบอร์ดติด และนับจำนวนครั้ง · หลังเปิดไฟรอเซนเซอร์นิ่ง ~1 นาที', 360, 70),
+    set('was', V(B('logic_boolean', { BOOL: 'FALSE' }))),
+    forever(
+      set('now', V(B('sens_pir', { PIN: '27' }))),
+      ifElse(B('variables_get', VAR('now')), [led(1)], [led(0)]),
+      showv('motion', getv('now')),
+      // count only the moment motion starts (false -> true), not every loop while it lasts
+      ifThen(B('logic_operation', { OP: 'AND' }, { A: getv('now'), B: V(B('logic_negate', null, { BOOL: getv('was') })) }),
+        change('count', 1),
+        showv('detections', getv('count')),
+        say(join('motion #', getv('count'), ' at ', V(B('math_round_to', { N: '0' }, { X: arith('DIVIDE', V(B('time_millis')), N(1000)) })), ' s'))),
+      set('was', getv('now')),
+      ms(50))), G_EXT],
+  ['ไฟเปิดอัตโนมัติเมื่อมีคน (ดับเองใน 10 วินาที)', program(
+    note(set('hold_s', N(10)),
+      'มีคนเดินผ่าน = ไฟติด แล้วดับเองเมื่อไม่มีการเคลื่อนไหวครบ hold_s วินาที\n' +
+      'PIR ที่ GPIO27 · ใช้กับรีเลย์: เปลี่ยนบล็อกไฟเป็น digitalWrite GPIO26', 360, 70),
+    set('last', N(-100000)),
+    forever(
+      ifThen(B('sens_pir', { PIN: '27' }), set('last', V(B('time_millis')))),
+      set('left', arith('MINUS', getv('hold_s'), arith('DIVIDE', arith('MINUS', V(B('time_millis')), getv('last')), N(1000)))),
+      ifElse(cmp('GT', getv('left'), N(0)),
+        [led(1), showv('light_off_in_s', V(B('math_round_to', { N: '0' }, { X: getv('left') })))],
+        [led(0), showv('light_off_in_s', N(0))]),
+      ms(100))), G_EXT],
+  ['อุณหภูมิ DS18B20 (GPIO4)', program(note(forever(
+    set('t', V(B('math_round_to', { N: '1' }, { X: V(B('sens_ds18b20', { PIN: '4' }, { N: N(1) })) }))),
+    showv('temp_C', getv('t')),
+    ifElse(cmp('GT', getv('t'), N(40)), [led(1)], [led(0)]),
+    B('time_delay_s', null, { S: N(1) })),
+    'DS18B20: แดง → 3.3V, ดำ → GND, เหลือง → GPIO4\n+ ตัวต้านทาน 4.7k จาก GPIO4 ไป 3.3V (โมดูลที่มีบอร์ดมักใส่มาแล้ว)\nร้อนเกิน 40°C ไฟบนบอร์ดติด · ลองจับหัววัดดูค่าเปลี่ยน', 360, 80)), G_EXT],
+  ['DS18B20 หลายตัวบนสายเดียว', program(
+    note(set('n', V(B('sens_ds18b20_count', { PIN: '4' }))),
+      'ต่อ DS18B20 หลายตัวพ่วงกันบนสาย DATA เส้นเดียว (GPIO4) ใช้ตัวต้านทาน 4.7k ตัวเดียว\nโปรแกรมนับจำนวนแล้วพิมพ์อุณหภูมิทุกตัวทุก 2 วินาที', 360, 70),
+    say(join('found ', getv('n'), ' sensors')),
+    // with n = 0 a Blockly "for 1 to n" would count down (1, 0), so loop only when n > 0
+    ifElse(cmp('GT', getv('n'), N(0)), [forever(
+      B('controls_for', VAR('i'), { FROM: N(1), TO: getv('n'), BY: N(1), DO: seq(
+        say(join('sensor ', getv('i'), ': ', V(B('math_round_to', { N: '1' }, { X: V(B('sens_ds18b20', { PIN: '4' }, { N: getv('i') })) })), ' C'))) }),
+      B('time_delay_s', null, { S: N(2) }))],
+      [say('no DS18B20 on GPIO4 - check wiring and the 4.7k resistor')])), G_EXT],
+  ['วัดระยะ HC-SR04', program(note(forever(
+    set('d', V(B('math_round_to', { N: '1' }, { X: V(B('sens_ultrasonic', { TRIG: '5', ECHO: '18' })) }))),
+    showv('distance_cm', getv('d')),
+    ifElse(B('logic_operation', { OP: 'AND' }, { A: V(cmp('GTE', getv('d'), N(0))), B: V(cmp('LT', getv('d'), N(20))) }), [led(1)], [led(0)]),
+    ms(100)),
+    'HC-SR04: VCC → 5V, GND → GND, Trig → GPIO5, Echo → GPIO18 ผ่านตัวต้านทาน 1k\n(และ 2k จาก GPIO18 ลง GND เพื่อลด 5V เหลือ 3.3V)\nของอยู่ใกล้กว่า 20 cm = ไฟติด · ได้ -1 = ไม่มีอะไรในระยะ', 360, 90)), G_EXT],
+  ['เซนเซอร์ถอยจอดรถ (HC-SR04)', program(note(forever(
+    set('d', V(B('sens_ultrasonic', { TRIG: '5', ECHO: '18' }))),
+    showv('distance_cm', V(B('math_round_to', { N: '0' }, { X: getv('d') }))),
+    B('controls_if', null, {
+      IF0: V(B('logic_operation', { OP: 'OR' }, { A: V(cmp('LT', getv('d'), N(0))), B: V(cmp('GT', getv('d'), N(100))) })),
+      DO0: seq(led(0), ms(200)),
+      IF1: V(cmp('LT', getv('d'), N(10))),
+      DO1: seq(led(1), ms(50)),
+      ELSE: seq(B('io_digital_toggle', { PIN: '2' }), B('time_delay_ms', null, { MS: arith('MULTIPLY', getv('d'), N(5)) })),
+    }, { extraState: { elseIfCount: 1, hasElse: true } })),
+    'เหมือนเซนเซอร์ถอยรถ: ยิ่งใกล้ ไฟยิ่งกะพริบเร็ว ใกล้กว่า 10 cm ไฟติดค้าง เกิน 1 เมตรไฟดับ\nต่อสายแบบเดียวกับตัวอย่าง "วัดระยะ HC-SR04" · เพิ่ม buzzer ที่ขาอื่นให้มีเสียงได้', 360, 80)), G_EXT],
+  ['สัมผัสแล้วไฟติด (T0 = GPIO4)', program(note(forever(
+    set('touch', V(B('io_touch_read', { PIN: '4' }))),
+    showv('touch_T0', getv('touch')),
+    ifElse(cmp('LT', getv('touch'), N(40)), [led(1)], [led(0)]),
+    ms(50)), 'ต่อสายไฟหรือแผ่นโลหะที่ GPIO4 แล้วแตะ\nค่าจะลดลงเมื่อแตะ ถ้าไฟไม่ติดให้ปรับเลข 40 ตามค่าที่เห็นในการ์ด', 330, 80)), G_EXT],
+  // ---------------------------------------------------------------- I2C sensors + OLED
+  ['ค้นหาอุปกรณ์ I2C', program(
+    note(B('i2c_scan'), 'ต่ออุปกรณ์ I2C: SDA → GPIO21, SCL → GPIO22, VCC → 3.3V, GND → GND\nกดรันแล้วดูที่อยู่และชื่ออุปกรณ์ในคอนโซล ถ้าไม่พบให้ตรวจสาย', 340, 80)), G_I2C],
+  ['จอ OLED: ข้อความ + ตัวนับ', program(
+    note(set('n', N(0)), 'จอ OLED SSD1306 128x64 (I2C 0x3C) ต่อ SDA=21 SCL=22\nตัวอักษรบนจอเป็นภาษาอังกฤษ/ตัวเลขเท่านั้น', 330, 70),
+    forever(
+      B('oled_clear'),
+      B('oled_text', null, { X: N(0), Y: N(0), TEXT: T('ESP32 Live Code') }),
+      B('oled_line', null, { X0: N(0), Y0: N(11), X1: N(127), Y1: N(11) }),
+      B('oled_text', { SIZE: '3' }, { X: N(0), Y: N(24), TEXT: getv('n') }),
+      change('n', 1),
+      ms(500))), G_I2C],
+  ['จอ OLED: ภาษาไทยกึ่งกลางจอ', program(
+    note(set('msg', T('สวัสดีครับ')),
+      'ข้อความภาษาไทยบนจอ OLED (ฟอนต์ไทยสูง 20 จุด ได้ 3 บรรทัด)\nจัดกึ่งกลางด้วย x = (128 − oled.width) ÷ 2', 330, 70),
+    B('oled_clear'),
+    B('oled_text', null, { X: V(B('math_round_to', { N: '0' }, { X: arith('DIVIDE', arith('MINUS', N(128),
+      V(B('oled_width', { SIZE: '1', FONT: 'auto' }, { TEXT: getv('msg') }))), N(2)) })), Y: N(0), TEXT: getv('msg') }),
+    B('oled_line', null, { X0: N(0), Y0: N(21), X1: N(127), Y1: N(21) }),
+    B('oled_text', null, { X: N(0), Y: N(24), TEXT: T('ยินดีต้อนรับ') }),
+    B('oled_text', { FONT: 'thai' }, { X: N(0), Y: N(44), TEXT: T('ESP32 Live Code') })), G_I2C],
+  ['จอ 0.91 นิ้ว (128x32): ข้อความ + ตัวนับ', program(
+    note(B('oled_begin', { TYPE: 'ssd1306_32' }),
+      'จอแถบ 0.91 นิ้ว 128x32 (SSD1306, I2C 0x3C) y ใช้ได้ 0-31\nภาษาไทย 1 บรรทัด (สูง 20 จุด) + ฟอนต์เล็กอีก 1 บรรทัดด้านล่าง', 330, 70),
+    set('n', N(0)),
+    forever(
+      B('oled_clear'),
+      B('oled_text', null, { X: N(0), Y: N(0), TEXT: T('นับเลข') }),
+      B('oled_text', { FONT: 'thai' }, { X: N(64), Y: N(0), TEXT: getv('n') }),
+      B('oled_text', { FONT: 'small' }, { X: N(0), Y: N(23), TEXT: T('ESP32 Live Code') }),
+      change('n', 1),
+      ms(500))), G_I2C],
+  ['จอ LCD 16x2: ข้อความ + ตัวนับ', program(
+    note(B('lcd_begin'), 'จอ LCD 16x2 + บอร์ด I2C หลังจอ: SDA → GPIO21, SCL → GPIO22, VCC → 5V, GND\n' +
+      'จอติดแต่เห็นแค่สี่เหลี่ยม/ว่าง = หมุนปรับความเข้ม (ตัวต้านทานสีฟ้าหลังจอ)', 340, 80),
+    B('lcd_clear'),
+    B('lcd_text', null, { COL: N(0), ROW: N(0), TEXT: T('ESP32 Live Code') }),
+    set('n', N(0)),
+    forever(
+      B('lcd_text', null, { COL: N(0), ROW: N(1), TEXT: join('count: ', getv('n'), '   ') }),
+      change('n', 1),
+      ms(500))), G_I2C],
+  ['อุณหภูมิ/ความชื้น AHT20 บนจอ LCD', program(
+    note(B('lcd_begin'), 'AHT20 + จอ LCD 16x2 ต่อสาย I2C เส้นเดียวกัน (SDA=21 SCL=22)\nจอ LCD ไม่มีตัวอักษรไทย จึงใช้คำอังกฤษ', 330, 60),
+    B('lcd_clear'),
+    forever(
+      B('lcd_text', null, { COL: N(0), ROW: N(0), TEXT: join('Temp ', V(B('math_round_to', { N: '1' }, { X: V(B('sens_aht20', { Q: 'temperature' })) })), '°C   ') }),
+      B('lcd_text', null, { COL: N(0), ROW: N(1), TEXT: join('Humi ', V(B('math_round_to', { N: '0' }, { X: V(B('sens_aht20', { Q: 'humidity' })) })), ' %   ') }),
+      B('time_delay_s', null, { S: N(1) }))), G_I2C],
+  ['อุณหภูมิ/ความชื้น DHT22 บนจอ OLED', program(note(forever(
+    set('t', V(B('sens_dht', { Q: 'temperature', PIN: '4' }))),
+    set('h', V(B('sens_dht', { Q: 'humidity', PIN: '4' }))),
+    B('oled_clear'),
+    B('oled_text', null, { X: N(0), Y: N(0), TEXT: join('อุณหภูมิ ', getv('t'), '°C') }),
+    B('oled_text', null, { X: N(0), Y: N(22), TEXT: join('ความชื้น ', getv('h'), '%') }),
+    B('oled_bar', null, { X: N(0), Y: N(48), W: N(128), H: N(14), P: getv('h') }),
+    B('time_delay_s', null, { S: N(2) })),
+    'DHT22 ที่ GPIO4 + จอ OLED (I2C SDA=21 SCL=22)\nแถบด้านล่าง = ความชื้น %', 320, 60)), G_I2C],
+  ['อุณหภูมิ/ความชื้น AHT20 บนจอ', program(note(forever(
+    set('t', V(B('math_round_to', { N: '1' }, { X: V(B('sens_aht20', { Q: 'temperature' })) }))),
+    set('h', V(B('math_round_to', { N: '0' }, { X: V(B('sens_aht20', { Q: 'humidity' })) }))),
+    showv('temp_C', getv('t')),
+    showv('humidity', getv('h')),
+    B('oled_clear'),
+    B('oled_text', null, { X: N(0), Y: N(0), TEXT: join('อุณหภูมิ ', getv('t'), '°C') }),
+    B('oled_text', null, { X: N(0), Y: N(22), TEXT: join('ความชื้น ', getv('h'), '%') }),
+    B('time_delay_s', null, { S: N(1) })),
+    'AHT20 (หรือ AHT10) + จอ OLED ต่อสาย I2C เส้นเดียวกัน (SDA=21 SCL=22)\nใช้ SHT31 หรือ BME280 แทนได้: เปลี่ยนบล็อก aht20 เป็นตัวที่มี', 340, 80)), G_I2C],
+  ['สถานีอากาศ BME280', program(note(forever(
+    set('t', V(B('math_round_to', { N: '1' }, { X: V(B('sens_bme280', { Q: 'temperature' })) }))),
+    set('p', V(B('math_round_to', { N: '0' }, { X: V(B('sens_bme280', { Q: 'pressure' })) }))),
+    showv('temp_C', getv('t')),
+    showv('pressure_hPa', getv('p')),
+    B('oled_clear'),
+    B('oled_text', { SIZE: '2' }, { X: N(0), Y: N(0), TEXT: join(getv('t'), ' C') }),
+    B('oled_text', { SIZE: '2' }, { X: N(0), Y: N(24), TEXT: join(getv('p'), ' hPa') }),
+    B('time_delay_s', null, { S: N(2) })),
+    'BME280/BMP280 + จอ OLED (I2C)\nความดันอากาศระดับน้ำทะเลประมาณ 1013 hPa ฝนใกล้ตกค่ามักลดลง\nBME280 วัดความชื้นได้ด้วย: เพิ่มบล็อก bme280.humidity()', 340, 90)), G_I2C],
+  ['วัดแสง BH1750 + แถบบนจอ', program(note(forever(
+    set('lux', V(B('math_round_to', { N: '0' }, { X: V(B('sens_bh1750')) }))),
+    showv('lux', getv('lux')),
+    B('oled_clear'),
+    B('oled_text', null, { X: N(0), Y: N(0), TEXT: T('Light (lux)') }),
+    B('oled_text', { SIZE: '3' }, { X: N(0), Y: N(14), TEXT: getv('lux') }),
+    B('oled_bar', null, { X: N(0), Y: N(48), W: N(128), H: N(14),
+      P: V(B('math_constrain', null, { VALUE: arith('DIVIDE', getv('lux'), N(10)), LOW: N(0), HIGH: N(100) })) }),
+    ms(200)),
+    'BH1750 + จอ OLED (I2C) แถบเต็มที่ 1000 lux\nห้องทั่วไป 100-500 lux · ใช้ไฟฉายส่องดูค่าเปลี่ยน', 330, 70)), G_I2C],
+  ['ระดับน้ำดิจิทัล MPU6050 บนจอ', program(note(forever(
+    set('pitch', V(B('sens_mpu_angle', { W: 'pitch' }))),
+    set('roll', V(B('sens_mpu_angle', { W: 'roll' }))),
+    showv('pitch', V(B('math_round_to', { N: '1' }, { X: getv('pitch') }))),
+    showv('roll', V(B('math_round_to', { N: '1' }, { X: getv('roll') }))),
+    B('oled_clear'),
+    B('oled_circle', null, { X: N(64), Y: N(32), R: N(30) }),
+    B('oled_line', null, { X0: N(64), Y0: N(0), X1: N(64), Y1: N(63) }),
+    B('oled_line', null, { X0: N(32), Y0: N(32), X1: N(96), Y1: N(32) }),
+    B('oled_circle', { FILL: 'true' }, {
+      X: V(B('math_constrain', null, { VALUE: arith('ADD', N(64), arith('MULTIPLY', getv('roll'), N(1.5))), LOW: N(38), HIGH: N(90) })),
+      Y: V(B('math_constrain', null, { VALUE: arith('ADD', N(32), arith('MULTIPLY', getv('pitch'), N(1.5))), LOW: N(6), HIGH: N(58) })),
+      R: N(5) }),
+    ms(30)),
+    'MPU6050 + จอ OLED (I2C) วางบนโต๊ะแล้วเอียง ลูกบอลจะไหลตามทางที่เอียง\nวงกลมอยู่กลางกากบาท = ได้ระดับ', 340, 70)), G_I2C],
+];
+
+// examples that use the OLED start with an oled.begin block, so owners of a 1.3" SH1106
+// only have to switch its dropdown
+function usesOled(b) { return !!b && typeof b === 'object' && (String(b.type).startsWith('oled_') || Object.values(b).some(usesOled)); }
+for (const ex of EXAMPLES) {
+  const top = ex[1].blocks.blocks;
+  const i = top.findIndex(b => b.type !== 'procedures_defnoreturn' && usesOled(b));
+  if (i < 0 || top[i].type === 'oled_begin') continue;
+  const old = top[i], { x, y } = old;
+  delete old.x; delete old.y;
+  top[i] = { type: 'oled_begin', fields: { TYPE: 'ssd1306' }, x, y, next: { block: old },
+    icons: { comment: { text: 'จอ 0.96 นิ้ว = SSD1306 · จอ 1.3 นิ้ว = เปลี่ยนเป็น SH1106', pinned: false, width: 280, height: 50 } } };
+}
+
+// ------------------------------------------------------------------ workspace
+let ws = null, tab = 'blocks', manual = false, lastExample = null;
+let wiringTimer = null, currentAnalysis = null, rightTab = 'console';
+const codeEl = $('code'), gutter = $('gutter');
+
+function genCode() { return ws ? lua.luaGenerator.workspaceToCode(ws) : ''; }
+
+let curName = store.get('lc_name') || '', dirty = store.get('lc_dirty') === '1', loading = false;
+
+function save() {
+  if (!ws) return;
+  store.set('lc_ws', JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+  store.set('lc_manual', manual ? codeEl.value : '');
+  if (!loading) setDirty(true);
+}
+
+function setDirty(d) {
+  dirty = d;
+  store.set('lc_dirty', d ? '1' : '');
+  store.set('lc_name', curName);
+  const f = $('fname');
+  f.textContent = curName ? '· ' + curName : '· (ยังไม่บันทึก)';
+  f.classList.toggle('dirty', d);
+}
+
+function loadState(state) {
+  loading = true;
+  try {
+    ws.clear();
+    Blockly.serialization.workspaces.load(state, ws);
+    ws.scrollCenter();
+  } finally {
+    // change events fire asynchronously; ignore the ones caused by loading
+    setTimeout(() => { loading = false; }, 0);
+  }
+}
+
+if (ok) {
+  const theme = Blockly.Theme.defineTheme('lc', { base: Blockly.Themes.Classic, name: 'lc',
+    fontStyle: { family: 'system-ui, "Noto Sans Thai", "Leelawadee UI", sans-serif', size: 12 } });
+  ws = Blockly.inject($('blocks'), {
+    toolbox: TOOLBOX, media: '/media/', sounds: false, renderer: 'zelos', theme, trashcan: true,
+    zoom: { controls: true, wheel: true, startScale: innerWidth < 800 ? 0.6 : 0.75, maxScale: 2, minScale: 0.3 },
+    move: { scrollbars: true, drag: true, wheel: false }, grid: { spacing: 24, length: 2, colour: '#e5e7eb', snap: true },
+  });
+  $('loading').remove();
+  let restored = false;
+  const saved = store.get('lc_ws');
+  if (saved) { try { loadState(JSON.parse(saved)); restored = true; } catch (e) { ws.clear(); } }
+  if (!restored) loadState(EXAMPLES[0][1]);
+  const m = store.get('lc_manual');
+  if (m) { manual = true; codeEl.value = m; }
+  ws.addChangeListener(e => { if (!e.isUiEvent) { save(); scheduleWiring(); } });
+} else {
+  $('loading').textContent = 'โหลดบล็อกไม่สำเร็จ — ใช้แท็บโค้ด Lua ได้';
+}
+
+
+// ------------------------------------------------------------------ tabs + code editor
+function updateGutter() {
+  const n = codeEl.value.split('\n').length;
+  let s = ''; for (let i = 1; i <= n; i++) s += i + '\n';
+  gutter.textContent = s;
+  gutter.scrollTop = codeEl.scrollTop;
+}
+function updateManual() { $('manualBar').style.display = manual ? 'flex' : 'none'; }
+
+async function showTab(t) {
+  if (t === 'blocks' && manual && tab === 'code') {
+    if (!await ask('ทิ้งโค้ดที่แก้เอง?', 'กลับไปใช้บล็อกจะทิ้งโค้ด Lua ที่แก้เอง และใช้โค้ดจากบล็อกแทน', 'ทิ้งและกลับไปบล็อก', 'danger')) return;
+    manual = false; updateManual(); save();
+  }
+  tab = t;
+  $('tools').style.visibility = t === 'blocks' ? '' : 'hidden';
+  scheduleWiring();
+  $('tabBlocks').classList.toggle('on', t === 'blocks');
+  $('tabCode').classList.toggle('on', t === 'code');
+  $('blocksPane').style.display = t === 'blocks' ? '' : 'none';
+  $('codePane').style.display = t === 'code' ? 'flex' : 'none';
+  if (t === 'code') { if (!manual) codeEl.value = genCode(); updateGutter(); }
+  else if (ws) Blockly.svgResize(ws);
+}
+$('tabBlocks').onclick = () => showTab('blocks');
+$('tabCode').onclick = () => showTab('code');
+$('discard').onclick = () => { manual = false; updateManual(); codeEl.value = genCode(); updateGutter(); save(); };
+codeEl.addEventListener('input', () => { if (!manual) { manual = true; updateManual(); } updateGutter(); save(); });
+codeEl.addEventListener('scroll', () => { gutter.scrollTop = codeEl.scrollTop; });
+codeEl.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  codeEl.setRangeText('  ', codeEl.selectionStart, codeEl.selectionEnd, 'end');
+  codeEl.dispatchEvent(new Event('input'));
+});
+if (!ok || manual) showTab('code');
+
+// ------------------------------------------------------------------ run / stop
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: body || '' });
+function run() {
+  const code = tab === 'code' ? codeEl.value : genCode();
+  lastRunCode = code;
+  post('/api/run', code).catch(() => addLine(1, 'ส่งโค้ดไม่สำเร็จ — ตรวจการเชื่อมต่อ'));
+}
+$('run').onclick = run;
+$('stop').onclick = () => post('/api/stop').catch(() => {});
+$('clr').onclick = () => { $('console').textContent = ''; };
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); run(); } });
+
+// ------------------------------------------------------------------ Thai error messages
+// Lua's English error text -> plain Thai. The original stays visible in small print.
+const TYPE_TH = { nil: 'ค่าว่าง (nil)', number: 'ตัวเลข', string: 'ข้อความ', table: 'ตาราง', boolean: 'ค่าจริง/เท็จ',
+  'function': 'ฟังก์ชัน', 'no value': 'ไม่ได้ใส่ค่า', userdata: 'userdata', thread: 'coroutine' };
+const th = t => TYPE_TH[t] || t;
+const who = (kind, name) => kind === 'field' ? 'ช่อง \'' + name + '\'' : kind === 'method' ? 'เมธอด \'' + name + '\'' : 'ตัวแปร \'' + name + '\'';
+const OPS_TH = { add: 'บวก', sub: 'ลบ', mul: 'คูณ', div: 'หาร', mod: 'หารเอาเศษ', pow: 'ยกกำลัง', unm: 'ใส่เครื่องหมายลบ', idiv: 'หารปัดเศษ',
+  band: 'and แบบบิต', bor: 'or แบบบิต', bxor: 'xor แบบบิต', shl: 'เลื่อนบิต', shr: 'เลื่อนบิต', bnot: 'not แบบบิต' };
+const ERR_RULES = [
+  [/^attempt to perform arithmetic on a nil value \((global|local|field|upvalue|constant) '(.+)'\)$/,
+    m => 'คำนวณกับ' + who(m[1], m[2]) + ' ไม่ได้ เพราะยังไม่มีค่า (nil) — สะกดชื่อผิด หรือยังไม่ได้ตั้งค่าก่อนใช้?'],
+  [/^attempt to perform arithmetic on a (\w+) value(?: \((\w+) '(.+)'\))?$/,
+    m => 'คำนวณกับ' + (m[3] ? who(m[2], m[3]) + ' ที่เป็น' : '') + th(m[1]) + ' ไม่ได้'],
+  [/^attempt to (\w+) a '(\w+)' with a '(\w+)'$/,
+    m => (OPS_TH[m[1]] || m[1]) + ' ' + th(m[2]) + ' กับ ' + th(m[3]) + ' ไม่ได้' +
+      (m[2] === 'string' || m[3] === 'string' ? ' — ต่อข้อความใช้ .. หรือแปลงเป็นตัวเลขด้วย tonumber()' : '')],
+  [/^attempt to call a nil value \((global|local|field|method|upvalue) '(.+)'\)$/,
+    m => 'ไม่มีฟังก์ชันชื่อ \'' + m[2] + '\' — สะกดผิด หรือยังไม่ได้สร้างฟังก์ชันนี้?'],
+  [/^attempt to call a (\w+) value(?: \((\w+) '(.+)'\))?$/,
+    m => (m[3] ? '\'' + m[3] + '\' เป็น' : 'ค่านี้เป็น') + th(m[1]) + ' ไม่ใช่ฟังก์ชัน จึงเรียกใช้ไม่ได้'],
+  [/^attempt to index a nil value(?: \((\w+) '(.+)'\))?$/,
+    m => (m[2] ? who(m[1], m[2]) : 'ค่านี้') + ' เป็นค่าว่าง (nil) จึงใช้ . หรือ [ ] กับมันไม่ได้ — ยังไม่ได้สร้างตาราง?'],
+  [/^attempt to index a (\w+) value(?: \((\w+) '(.+)'\))?$/,
+    m => (m[3] ? who(m[2], m[3]) + ' เป็น' : 'ค่านี้เป็น') + th(m[1]) + ' จึงใช้ . หรือ [ ] ไม่ได้'],
+  [/^attempt to concatenate a (\w+) value(?: \((\w+) '(.+)'\))?$/,
+    m => 'ต่อข้อความ (..) กับ' + (m[3] ? who(m[2], m[3]) + ' ที่เป็น' : '') + th(m[1]) + ' ไม่ได้' + (m[1] === 'nil' ? ' — ยังไม่ได้ตั้งค่า?' : '')],
+  [/^attempt to compare two (\w+) values$/, m => 'เปรียบเทียบ' + th(m[1]) + ' สองค่าด้วย < > ไม่ได้'],
+  [/^attempt to compare (\w+) with (\w+)$/, m => 'เปรียบเทียบ' + th(m[1]) + ' กับ ' + th(m[2]) + ' ไม่ได้'],
+  [/^attempt to get length of a (\w+) value(?: \((\w+) '(.+)'\))?$/,
+    m => 'หาความยาว (#) ของ' + (m[3] ? who(m[2], m[3]) + ' ที่เป็น' : '') + th(m[1]) + ' ไม่ได้'],
+  [/^attempt to divide by zero$/, () => 'หารด้วยศูนย์ไม่ได้'],
+  [/^attempt to perform 'n%%0'$/, () => 'หารเอาเศษด้วยศูนย์ไม่ได้'],
+  [/^attempt to assign to const variable '(.+)'$/, m => 'แก้ค่าคงที่ \'' + m[1] + '\' ไม่ได้'],
+  [/^bad argument #(\d+) to '(.+)' \((\w+) expected, got (.+)\)$/,
+    m => 'คำสั่ง ' + m[2] + '(): ค่าที่ ' + m[1] + ' ต้องเป็น' + th(m[3]) + (m[4] === 'no value' ? ' แต่ไม่ได้ใส่มา' : ' แต่ได้' + th(m[4]))],
+  [/^bad argument #(\d+) to '(.+)' \((.+)\)$/, m => 'คำสั่ง ' + m[2] + '(): ค่าที่ ' + m[1] + ' ไม่ถูกต้อง (' + m[3] + ')'],
+  [/^number has no integer representation$/, () => 'ต้องเป็นจำนวนเต็ม (ไม่มีทศนิยม)'],
+  [/^table index is (nil|NaN)$/, m => 'ใช้ ' + m[1] + ' เป็นตำแหน่งในตารางไม่ได้'],
+  [/^stack overflow/, () => 'ฟังก์ชันเรียกซ้อนกันลึกเกินไป — ฟังก์ชันเรียกตัวเองไม่รู้จบ?'],
+  [/^'end' expected \(to close '(\w+)' at line (\d+)\) near (.+)$/,
+    m => 'ขาดคำว่า end ปิด \'' + m[1] + '\' ที่เริ่มบรรทัด ' + m[2]],
+  [/^'(.+)' expected \(to close '(.+)' at line (\d+)\) near (.+)$/,
+    m => 'ขาด \'' + m[1] + '\' ปิด \'' + m[2] + '\' ที่บรรทัด ' + m[3]],
+  [/^'(.+)' expected near <eof>$/, m => 'โค้ดจบก่อนมี \'' + m[1] + '\''],
+  [/^'(.+)' expected near '(.+)'$/, m => 'ต้องมี \'' + m[1] + '\' ก่อน \'' + m[2] + '\''],
+  [/^<eof> expected near '(.+)'$/, m => 'มี \'' + m[1] + '\' เกินมา — end เกิน หรือเขียนต่อหลัง return?'],
+  [/^unexpected symbol near <eof>$/, () => 'โค้ดจบกะทันหัน — เขียนคำสั่งไม่ครบ'],
+  [/^unexpected symbol near '(.+)'$/, m => 'เขียนผิดรูปแบบตรง \'' + m[1] + '\''],
+  [/^unfinished string near/, () => 'ข้อความไม่ได้ปิดเครื่องหมายคำพูด " หรือ \''],
+  [/^unfinished long (string|comment)/, m => (m[1] === 'string' ? 'ข้อความ' : 'คอมเมนต์') + ' [[ ... ]] ไม่ได้ปิด'],
+  [/^malformed number near '(.+)'$/, m => 'ตัวเลข \'' + m[1] + '\' เขียนผิดรูปแบบ'],
+  [/^no visible label '(.+)' for <goto>/, m => 'ไม่พบป้าย \'' + m[1] + '\' สำหรับ goto'],
+  [/^break outside (a )?loop/, () => 'ใช้ break นอกลูปไม่ได้'],
+  [/^'for' initial value must be a number$/, () => 'ค่าเริ่มของ for ต้องเป็นตัวเลข'],
+  [/^'for' (limit|step) must be a number$/, m => (m[1] === 'limit' ? 'ค่าสิ้นสุด' : 'ค่าเพิ่มทีละ') + 'ของ for ต้องเป็นตัวเลข'],
+  [/^'for' step is zero$/, () => 'ค่าเพิ่มทีละของ for เป็นศูนย์ไม่ได้ (จะวนไม่จบ)'],
+];
+// "✖ โปรแกรม:12: msg" -> {line, thai, orig}; null when the line is not a Lua error
+function explainError(text) {
+  const m = /^✖ (?:โปรแกรม:(\d+): )?(.*)$/s.exec(text);
+  if (!m) return null;
+  const line = m[1] ? +m[1] : 0, orig = m[2];
+  for (const [re, f] of ERR_RULES) {
+    const r = re.exec(orig);
+    if (r) return { line, thai: f(r), orig };
+  }
+  return { line, thai: orig, orig: '' };   // already Thai (our own messages) or unknown
+}
+
+// jump to a line in the Lua tab (the code shown there is what ran, unless it changed since)
+let lastRunCode = '';
+async function gotoLine(n) {
+  if (tab !== 'code') await showTab('code');
+  if (tab !== 'code') return;
+  if (codeEl.value !== lastRunCode) toast('โค้ดเปลี่ยนไปหลังจากรัน บรรทัดอาจไม่ตรง');
+  const lines = codeEl.value.split('\n');
+  if (n < 1 || n > lines.length) return;
+  const start = lines.slice(0, n - 1).reduce((a, l) => a + l.length + 1, 0);
+  codeEl.focus();
+  codeEl.setSelectionRange(start, start + lines[n - 1].length);
+  const lh = parseFloat(getComputedStyle(codeEl).lineHeight) || 21;
+  codeEl.scrollTop = Math.max(0, (n - 3) * lh);
+}
+
+// ------------------------------------------------------------------ console + live values
+const con = $('console');
+function addLine(t, m) {
+  const atBottom = con.scrollTop + con.clientHeight >= con.scrollHeight - 4;
+  const d = document.createElement('div');
+  d.className = 't' + t;
+  const e = t === 1 ? explainError(m) : null;
+  if (e) {
+    d.append('✖ ' + (e.line ? 'บรรทัด ' + e.line + ': ' : '') + e.thai);
+    if (e.orig) d.append(el('div', { className: 'orig', textContent: 'Lua: ' + e.orig }));
+    if (e.line) { d.classList.add('jump'); d.title = 'คลิกเพื่อดูบรรทัด ' + e.line + ' ในแท็บโค้ด Lua'; d.onclick = () => gotoLine(e.line); }
+  } else d.textContent = m;
+  con.appendChild(d);
+  while (con.childNodes.length > 500) con.removeChild(con.firstChild);
+  if (atBottom) con.scrollTop = con.scrollHeight;
+}
+
+const cards = new Map();   // name -> {el, v, svg, line, hist}
+const HIST = 60;
+const SVGNS = 'http://www.w3.org/2000/svg';
+function fmt(v) {
+  if (!/^-?\d+(\.\d+)?(e[-+]?\d+)?$/i.test(v)) return v;
+  const n = Number(v);
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 1000) / 1000);
+}
+function renderVals(vals) {
+  for (const [k, c] of cards) if (!(k in vals)) { c.el.remove(); cards.delete(k); }
+  for (const k in vals) {
+    let c = cards.get(k);
+    if (!c) {
+      const el = document.createElement('div'); el.className = 'card';
+      const kk = document.createElement('div'); kk.className = 'k'; kk.textContent = k; kk.title = k;
+      const v = document.createElement('div'); v.className = 'v';
+      el.append(kk, v); $('vals').appendChild(el);
+      c = { el, v, svg: null, line: null, hist: [], last: null };
+      cards.set(k, c);
+    }
+    const raw = vals[k];
+    c.v.textContent = fmt(raw); c.v.title = raw;
+    const n = Number(raw);
+    if (raw !== '' && isFinite(n)) {
+      c.hist.push(n); if (c.hist.length > HIST) c.hist.shift();
+      if (!c.svg) {
+        c.svg = document.createElementNS(SVGNS, 'svg'); c.svg.setAttribute('viewBox', '0 0 100 30'); c.svg.setAttribute('preserveAspectRatio', 'none');
+        c.line = document.createElementNS(SVGNS, 'polyline'); c.svg.appendChild(c.line); c.el.appendChild(c.svg);
+      }
+      const lo = Math.min(...c.hist), hi = Math.max(...c.hist), span = hi - lo || 1;
+      c.line.setAttribute('points', c.hist.map((y, i) => (i * 100 / (HIST - 1)).toFixed(1) + ',' + (28 - (y - lo) / span * 26).toFixed(1)).join(' '));
+    }
+  }
+}
+
+// ------------------------------------------------------------------ dialogs
+const dlg = $('dlg');
+function el(tag, props, ...kids) {
+  const e = Object.assign(document.createElement(tag), props || {});
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+// buttons: [[label, value, cls]]; resolves with the clicked value (null when closed with Esc)
+function dialog(title, body, buttons) {
+  $('dlgTitle').textContent = title;
+  $('dlgBody').replaceChildren(...[].concat(body));
+  const foot = $('dlgFoot'); foot.replaceChildren();
+  return new Promise(res => {
+    const done = v => { dlg.oncancel = null; dlg.close(); res(v); };
+    for (const [label, value, cls] of buttons) {
+      foot.append(el('button', { textContent: label, className: cls || '', onclick: () => done(value) }));
+    }
+    // Esc closes as "no answer". ('cancel' fires synchronously, unlike 'close', so a dialog
+    // opened right after another one is not cancelled by the previous close event.)
+    dlg.oncancel = e => { e.preventDefault(); done(null); };
+    if (!dlg.open) dlg.showModal();
+    const first = dlg.querySelector('.db input:not([type=checkbox])'); if (first) first.focus();
+  });
+}
+const ask = (title, msg, okLabel, cls) =>
+  dialog(title, el('p', { textContent: msg }), [['ยกเลิก', false], [okLabel || 'ตกลง', true, cls || 'primary']]).then(v => !!v);
+const info = (title, msg) =>
+  dialog(title, [].concat(msg).map(m => typeof m === 'string' ? el('p', { textContent: m }) : m), [['ปิด', true, 'primary']]);
+let toastT;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2500);
+}
+function isEmpty() { return !manual && (!ws || !ws.getAllBlocks(false).length); }
+async function okToReplace(what) {
+  if (!dirty || isEmpty()) return true;
+  return ask(what + '?', 'งานปัจจุบัน' + (curName ? ' "' + curName + '"' : '') + ' ยังไม่ได้บันทึกลงบอร์ด จะถูกแทนที่', 'แทนที่', 'danger');
+}
+
+// ------------------------------------------------------------------ program files
+// .blk on the board and exported .json share one format:
+// { format, v, name, blocks (Blockly JSON), manual (hand-written Lua or null), lua (code that runs) }
+function currentLua() { return manual ? codeEl.value : genCode(); }
+function snapshot() {
+  return { format: 'esp32-livecode', v: 1, name: curName,
+    blocks: ws ? Blockly.serialization.workspaces.save(ws) : null, manual: manual ? codeEl.value : null, lua: currentLua() };
+}
+function applyProgram(p, isDirty) {
+  lastExample = null;
+  if (ws) loadState(p.blocks || {});
+  manual = p.manual != null;
+  codeEl.value = manual ? p.manual : '';
+  updateManual();
+  curName = p.name || '';
+  tab = '';                                   // force the tab to refresh
+  showTab(manual ? 'code' : 'blocks');
+  setTimeout(() => { save(); setDirty(!!isDirty); }, 0);
+}
+async function api(method, url, body, type) {
+  const headers = body != null && !(body instanceof FormData) ? { 'Content-Type': type || 'text/plain; charset=utf-8' } : {};
+  const r = await fetch(url, { method, body, headers });
+  const t = await r.text();
+  if (!r.ok) throw new Error(t || ('HTTP ' + r.status));
+  return t;
+}
+const fileUrl = (name, kind) => '/api/file?name=' + encodeURIComponent(name) + '&kind=' + kind;
+// files are uploaded as multipart/form-data (the board streams them to flash)
+function putFile(name, kind, text) {
+  const fd = new FormData();
+  fd.append('file', new Blob([text], { type: 'text/plain' }), name + '.' + kind);
+  return api('POST', fileUrl(name, kind), fd);
+}
+const NAME_RE = /^[a-z0-9_-]{1,24}$/;
+const cleanName = n => (n || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 24);
+
+async function saveTo(name) {
+  const prev = curName;
+  try {
+    curName = name;
+    await putFile(name, 'lua', currentLua());
+    await putFile(name, 'blk', JSON.stringify(snapshot()));
+    setDirty(false);
+    toast('บันทึก "' + name + '" ลงบอร์ดแล้ว');
+    return true;
+  } catch (e) {
+    curName = prev;
+    info('บันทึกไม่สำเร็จ', e.message);
+    return false;
+  }
+}
+
+async function listFiles() { return JSON.parse(await api('GET', '/api/files')).sort(); }
+
+async function saveAs() {
+  let files = [];
+  try { files = await listFiles(); } catch (e) {}
+  const input = el('input', { type: 'text', value: curName || cleanName(''), placeholder: 'เช่น blink', autocapitalize: 'off', spellcheck: false });
+  const err = el('div', { className: 'err' });
+  const body = [el('label', { textContent: 'ชื่อโปรแกรม (a-z 0-9 _ - ยาวไม่เกิน 24 ตัว)' }), input, err];
+  if (files.length) body.push(el('div', { className: 'muted', textContent: 'บนบอร์ดมี: ' + files.join(', ') }));
+  input.addEventListener('input', () => { input.value = input.value.toLowerCase().replace(/\s+/g, '_'); err.textContent = ''; });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); dlg.querySelector('.df .primary').click(); } });
+  for (;;) {
+    const v = await dialog('บันทึกลงบอร์ด', body, [['ยกเลิก', false], ['บันทึก', true, 'primary']]);
+    if (!v) return false;
+    const name = input.value.trim();
+    if (!NAME_RE.test(name)) { err.textContent = 'ใช้ได้เฉพาะ a-z 0-9 _ - ยาว 1-24 ตัว'; continue; }
+    if (files.includes(name) && name !== curName &&
+        !await ask('เขียนทับ "' + name + '"?', 'บนบอร์ดมีโปรแกรมชื่อนี้อยู่แล้ว', 'เขียนทับ', 'danger')) continue;
+    return saveTo(name);
+  }
+}
+
+async function openFile(name) {
+  let p;
+  try {
+    p = JSON.parse(await api('GET', fileUrl(name, 'blk')));
+  } catch (e) {
+    try { p = { manual: await api('GET', fileUrl(name, 'lua')) }; }   // only Lua on the board
+    catch (e2) { info('เปิดไม่สำเร็จ', e2.message); return; }
+  }
+  p.name = name;
+  applyProgram(p);
+  toast('เปิด "' + name + '" แล้ว');
+}
+
+async function openDialog() {
+  let files;
+  try { files = await listFiles(); } catch (e) { info('อ่านรายการไม่สำเร็จ', e.message); return; }
+  const box = el('div');
+  if (!files.length) box.append(el('p', { className: 'muted', textContent: 'ยังไม่มีโปรแกรมที่บันทึกไว้บนบอร์ด' }));
+  for (const f of files) {
+    const open = el('button', { textContent: 'เปิด', className: 'primary' });
+    const del = el('button', { textContent: 'ลบ' });
+    open.onclick = async () => { dlg.close(); if (await okToReplace('เปิด "' + f + '"')) openFile(f); };
+    del.onclick = async () => {
+      dlg.close();
+      if (await ask('ลบ "' + f + '"?', 'ลบโปรแกรมนี้ออกจากบอร์ด กู้คืนไม่ได้', 'ลบ', 'danger')) {
+        try {
+          await api('DELETE', fileUrl(f, 'lua'));
+          if (f === curName) { curName = ''; setDirty(true); }
+          toast('ลบ "' + f + '" แล้ว');
+        } catch (e) { await info('ลบไม่สำเร็จ', e.message); }
+      }
+      openDialog();
+    };
+    box.append(el('div', { className: 'row' }, el('span', { className: 'n', textContent: f }), open, del));
+  }
+  dialog('เปิดโปรแกรมจากบอร์ด', box, [['ปิด', null]]);
+}
+
+async function setAutorun() {
+  if (!await ask('ตั้งเป็นโปรแกรม autorun?', 'งานที่เปิดอยู่ตอนนี้' + (curName ? ' ("' + curName + '")' : '') +
+      ' จะรันเองทุกครั้งที่เปิดบอร์ดหรือเสียบไฟ แม้ไม่ได้เปิดหน้าเว็บ', 'ตั้งเป็น autorun')) return;
+  try {
+    await putFile('__autorun', 'lua', currentLua());
+    await putFile('__autorun', 'blk', JSON.stringify(snapshot()));
+    toast('ตั้ง autorun แล้ว');
+    refreshInfo();
+  } catch (e) { info('ตั้ง autorun ไม่สำเร็จ', e.message); }
+}
+async function clearAutorun() {
+  if (!await ask('ยกเลิก autorun?', 'บอร์ดจะไม่รันโปรแกรมเองตอนเปิดเครื่อง (โปรแกรมที่บันทึกไว้ยังอยู่)', 'ยกเลิก autorun', 'danger')) return;
+  try { await api('DELETE', fileUrl('__autorun', 'lua')); toast('ยกเลิก autorun แล้ว'); refreshInfo(); }
+  catch (e) { info('ไม่สำเร็จ', e.message); }
+}
+
+function exportFile() {
+  const blob = new Blob([JSON.stringify(snapshot(), null, 1)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: (curName || 'program') + '.json' });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function importText(text, fileName) {
+  let p;
+  try { p = JSON.parse(text); if (p.format !== 'esp32-livecode') throw new Error(); }
+  catch (err) { info('นำเข้าไม่สำเร็จ', 'ไฟล์นี้ไม่ใช่โปรแกรมของ ESP32 Live Code'); return; }
+  if (!await okToReplace('นำเข้า "' + fileName + '"')) return;
+  // imported work is not on the board yet: keep it unnamed and unsaved
+  applyProgram(Object.assign({}, p, { name: '' }), true);
+  toast('นำเข้าแล้ว — กด "บันทึกลงบอร์ด" เพื่อเก็บไว้บนบอร์ด');
+}
+$('importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (f) importText(await f.text(), f.name);
+};
+
+// ------------------------------------------------------------------ WiFi
+let boardInfo = {};
+async function wifiDialog() {
+  const ssid = el('input', { type: 'text', value: boardInfo.saved || '', placeholder: 'ชื่อ WiFi', autocapitalize: 'off', spellcheck: false });
+  const pass = el('input', { type: 'password', placeholder: 'รหัสผ่าน (เว้นว่างถ้าไม่มี)', autocomplete: 'off' });
+  const show = el('input', { type: 'checkbox', onchange: () => { pass.type = show.checked ? 'text' : 'password'; } });
+  const err = el('div', { className: 'err' });
+  const list = el('div');
+  const scanBtn = el('button', { textContent: 'ค้นหา WiFi รอบตัว' });
+  scanBtn.onclick = async () => {
+    scanBtn.disabled = true; scanBtn.textContent = 'กำลังค้นหา… (ประมาณ 3 วินาที)';
+    try {
+      const nets = JSON.parse(await api('GET', '/api/scan'));
+      list.replaceChildren(...(nets.length ? nets.map(n =>
+        el('div', { className: 'row pick', onclick: () => { ssid.value = n.ssid; pass.focus(); } },
+          el('span', { className: 'n', textContent: (n.lock ? '🔒 ' : '') + n.ssid }),
+          el('span', { className: 'muted', textContent: n.rssi + ' dBm' })))
+        : [el('p', { className: 'muted', textContent: 'ไม่พบ WiFi' })]));
+    } catch (e) { list.replaceChildren(el('p', { className: 'err', textContent: 'ค้นหาไม่สำเร็จ: ' + e.message })); }
+    scanBtn.disabled = false; scanBtn.textContent = 'ค้นหาอีกครั้ง';
+  };
+  const now = boardInfo.mode === 'sta'
+    ? 'ตอนนี้ต่อ WiFi "' + boardInfo.ssid + '" อยู่ (IP ' + boardInfo.ip + ')'
+    : 'ตอนนี้บอร์ดเปิด WiFi ของตัวเอง "' + (boardInfo.ssid || 'ESP32-LiveCode') + '" (โหมด AP)';
+  const body = [el('p', { className: 'muted', textContent: now }), scanBtn, list,
+    el('label', { textContent: 'ชื่อ WiFi' }), ssid, el('label', { textContent: 'รหัสผ่าน' }), pass,
+    el('label', {}, show, ' แสดงรหัส'), err];
+  for (;;) {
+    const v = await dialog('ตั้งค่า WiFi', body, [['ยกเลิก', null], ['ล้างค่า (ใช้โหมด AP)', 'clear'], ['บันทึกและรีบูต', 'save', 'primary']]);
+    if (!v) return;
+    const s = v === 'clear' ? '' : ssid.value.trim(), p = v === 'clear' ? '' : pass.value;
+    if (v === 'save' && !s) { err.textContent = 'ใส่ชื่อ WiFi'; continue; }
+    if (p && (p.length < 8 || p.length > 63)) { err.textContent = 'รหัส WiFi ต้องยาว 8-63 ตัว'; continue; }
+    if (v === 'clear' && !await ask('ล้างค่า WiFi?', 'บอร์ดจะลืม WiFi ที่ตั้งไว้ แล้วรีบูตเป็นโหมด AP', 'ล้างค่าและรีบูต', 'danger')) continue;
+    try {
+      await api('POST', '/api/wifi', new URLSearchParams({ ssid: s, pass: p }).toString(), 'application/x-www-form-urlencoded');
+    } catch (e) { err.textContent = e.message; continue; }
+    info('บอร์ดกำลังรีบูต', s ? [
+      'บอร์ดจะลองต่อ WiFi "' + s + '" ภายใน 15 วินาที',
+      'ต่อสำเร็จ: ให้คอม/มือถือต่อ WiFi เดียวกัน แล้วเปิด http://esp32.local (หรือดู IP ทาง Serial)',
+      'ต่อไม่ได้: บอร์ดจะเปิด WiFi "ESP32-LiveCode" (รหัส 12345678) ให้เข้า http://192.168.4.1 แล้วตั้งค่าใหม่',
+    ] : ['บอร์ดจะเปิด WiFi "ESP32-LiveCode" (รหัส 12345678) ให้ต่อแล้วเปิด http://192.168.4.1']);
+    return;
+  }
+}
+
+async function reboot() {
+  if (!await ask('รีบูตบอร์ด?', 'โปรแกรมที่รันอยู่จะหยุด ถ้ามี autorun จะเริ่มใหม่เอง', 'รีบูต')) return;
+  api('POST', '/api/reboot').catch(() => {});
+  toast('กำลังรีบูต…');
+}
+
+// ------------------------------------------------------------------ menu
+const menu = $('menu');
+$('menuBtn').onclick = e => {
+  e.stopPropagation();
+  menu.classList.toggle('open');
+  // on narrow screens the menu is position:fixed; put it just under the button
+  if (getComputedStyle(menu).position === 'fixed') menu.style.top = ($('menuBtn').getBoundingClientRect().bottom + 4) + 'px';
+};
+document.addEventListener('click', () => menu.classList.remove('open'));
+const ACTIONS = {
+  new: async () => { if (await okToReplace('เริ่มงานใหม่')) applyProgram({ name: '', blocks: {}, manual: null }); },
+  open: openDialog,
+  save: () => curName ? saveTo(curName) : saveAs(),
+  saveas: saveAs,
+  autorun: setAutorun,
+  noauto: clearAutorun,
+  export: exportFile,
+  import: () => $('importFile').click(),
+  wifi: wifiDialog,
+  reboot,
+};
+menu.addEventListener('click', e => {
+  const a = e.target.dataset && e.target.dataset.a;
+  if (!a) return;
+  menu.classList.remove('open');
+  ACTIONS[a]();
+});
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); ACTIONS.save(); }
+});
+
+// ================================================================== UX part 1: wiring guide (which part goes to which pin)
+// The wiring tab reads the blocks in the workspace and says, for every part used, which of its
+// pins goes to which pin of the board. Same engine feeds the example gallery.
+
+// ---- the board: DOIT ESP32 DevKit V1 (30 pins), USB at the bottom. [silkscreen label, gpio | rail]
+const BOARD30 = {
+  name: 'DOIT ESP32 DevKit V1 (30 ขา)',
+  left:  [['EN', 'en'], ['VP', 36], ['VN', 39], ['D34', 34], ['D35', 35], ['D32', 32], ['D33', 33], ['D25', 25], ['D26', 26], ['D27', 27],
+          ['D14', 14], ['D12', 12], ['D13', 13], ['GND', 'gnd'], ['VIN', '5v']],
+  right: [['D23', 23], ['D22', 22], ['TX0', 1], ['RX0', 3], ['D21', 21], ['D19', 19], ['D18', 18], ['D5', 5], ['TX2', 17], ['RX2', 16],
+          ['D4', 4], ['D2', 2], ['D15', 15], ['GND', 'gnd'], ['3V3', '3v3']],
+};
+const GPIO_SILK = {};
+for (const side of [BOARD30.left, BOARD30.right]) for (const [lab, id] of side) if (typeof id === 'number') GPIO_SILK[id] = lab;
+const silk = g => GPIO_SILK[g] || 'D' + g;
+const pinText = g => 'ขา ' + silk(g) + (silk(g) === 'D' + g ? '' : ' (GPIO' + g + ')');
+
+const ROLE_COLOR = { ok: '#22c55e', warn: '#f59e0b', input: '#3b82f6', bad: '#ef4444', power: '#94a3b8' };
+const PIN_INFO = {
+  1: { role: 'bad', note: 'สาย USB (TX) ห้ามใช้' },
+  3: { role: 'bad', note: 'สาย USB (RX) ห้ามใช้' },
+  2: { role: 'warn', note: 'LED บนบอร์ด · ระวังตอนเปิดเครื่อง' },
+  4: { role: 'ok', note: 'ใช้ได้ · Touch' },
+  5: { role: 'ok', note: 'ใช้ได้' },
+  12: { role: 'warn', note: '⚠ ห้ามดึงเป็น HIGH ตอนเปิดเครื่อง' },
+  13: { role: 'ok', note: 'ใช้ได้ · Touch' },
+  14: { role: 'ok', note: 'ใช้ได้ · Touch' },
+  15: { role: 'warn', note: '⚠ มีสัญญาณตอนเปิดเครื่อง' },
+  16: { role: 'ok', note: 'ใช้ได้ (RX2)' },
+  17: { role: 'ok', note: 'ใช้ได้ (TX2)' },
+  18: { role: 'ok', note: 'ใช้ได้' },
+  19: { role: 'ok', note: 'ใช้ได้' },
+  21: { role: 'ok', note: 'ใช้ได้ · I2C SDA มาตรฐาน' },
+  22: { role: 'ok', note: 'ใช้ได้ · I2C SCL มาตรฐาน' },
+  23: { role: 'ok', note: 'ใช้ได้' },
+  25: { role: 'ok', note: 'ใช้ได้ · ส่งเสียงได้' },
+  26: { role: 'ok', note: 'ใช้ได้' },
+  27: { role: 'ok', note: 'ใช้ได้ · Touch' },
+  32: { role: 'ok', note: 'ใช้ได้ · อนาล็อก · Touch' },
+  33: { role: 'ok', note: 'ใช้ได้ · อนาล็อก · Touch' },
+  34: { role: 'input', note: 'อ่านอย่างเดียว · อนาล็อก' },
+  35: { role: 'input', note: 'อ่านอย่างเดียว · อนาล็อก' },
+  36: { role: 'input', note: 'อ่านอย่างเดียว · อนาล็อก' },
+  39: { role: 'input', note: 'อ่านอย่างเดียว · อนาล็อก' },
+};
+const PIN_WARN = {
+  2: 'ขา D2 คือ LED บนบอร์ด — อุปกรณ์ที่ต่ออยู่จะทำให้ LED ติดตามไปด้วย และถ้าอุปกรณ์ดึงขานี้เป็น HIGH ตอนเปิดไฟ บอร์ดอาจไม่ยอมบูต',
+  12: 'ขา D12 ถ้าถูกดึงเป็น HIGH ตอนเปิดไฟ บอร์ดจะบูตไม่ขึ้น (แฟลชไม่ได้ด้วย) — ถ้าเป็นไปได้ย้ายไปใช้ D13, D14 หรือ D27',
+  15: 'ขา D15 มีสัญญาณออกมาสั้น ๆ ตอนเปิดไฟ (ส่งข้อความบูต) อุปกรณ์บางอย่างจะทำงานผิดจังหวะ — ถ้าเป็นไปได้ย้ายไปใช้ D13, D14 หรือ D27',
+};
+
+// ---- wire colours (the same colours show on the board drawing and in the part cards)
+const SIGNAL_COLORS = ['#16a34a', '#7c3aed', '#0891b2', '#db2777', '#ca8a04', '#ea580c', '#4f46e5', '#0d9488'];
+const RAILS = { '3V3': { color: '#f97316', text: '3.3V', pin: 'ขา 3V3' }, '5V': { color: '#dc2626', text: '5V', pin: 'ขา VIN (5V)' }, GND: { color: '#111827', text: 'GND', pin: 'ขา GND' } };
+const G = n => ({ gpio: n }), PW = r => ({ rail: r });
+const wire = (pin, to, via, role) => ({ pin, to, via: via || '', role: role || '' });
+const wireColor = (w, dev) => w.role === 'sda' ? '#2563eb' : w.role === 'scl' ? '#eab308' : w.to.rail ? RAILS[w.to.rail].color : dev.color;
+const KIND_TEXT = { sensor: 'เซนเซอร์', display: 'จอแสดงผล', actuator: 'ตัวสั่งงาน', input: 'ปุ่ม / ตัวปรับค่า' };
+
+// ---- analysis: blocks -> parts, pins, rails, warnings
+function analyzeBlocks(blocks) {
+  const devs = new Map();
+  const onboard = { led: false, boot: false };
+  const extra = [];
+  const gf = (b, n) => Number(b.getFieldValue(n));
+  const sf = (b, n) => String(b.getFieldValue(n));
+  const mk = (name, short, icon, kind, wires, more) => Object.assign({ name, short, icon, kind, wires, parts: [], fix: [], notes: [], shared: null, pwm: 0 }, more || {});
+  const put = (key, dev, override) => { if (override || !devs.has(key)) devs.set(key, dev); };
+
+  const i2cB = blocks.find(b => b.type === 'i2c_begin');
+  const SDA = i2cB ? gf(i2cB, 'SDA') : 21, SCL = i2cB ? gf(i2cB, 'SCL') : 22;
+  const i2cDev = (key, name, short, icon, kind, vcc, more) => put('i2c:' + key, mk(name, short, icon, kind, [
+    wire('SDA', G(SDA), '', 'sda'), wire('SCL', G(SCL), '', 'scl'), wire('VCC', PW(vcc)), wire('GND', PW('GND'))],
+    Object.assign({ shared: 'i2c' }, more || {})));
+  const analogDev = (pin, name, short, icon, wires, more, strong) => put('analog:' + pin, mk(name, short, icon, 'sensor', wires, more), strong);
+  const addLed = p => {
+    if (p === 2) { onboard.led = true; return; }
+    put('out:' + p, mk('LED หรืออุปกรณ์ที่สั่งเปิด/ปิด', 'LED', '💡', 'actuator',
+      [wire('ขา + (ขายาวของ LED)', G(p), 'ผ่านตัวต้านทาน 220Ω'), wire('ขา −', PW('GND'))],
+      { parts: ['ตัวต้านทาน 220Ω (ต่อกับ LED)'], notes: ['ต่อ LED ภายนอกต้องมีตัวต้านทาน 220Ω ต่ออนุกรมเสมอ ไม่งั้น LED หรือบอร์ดอาจเสีย'] }));
+  };
+  const oledB = blocks.find(b => b.type === 'oled_begin');
+  const oledType = oledB ? sf(oledB, 'TYPE') : 'ssd1306';
+  const OLED_NAME = { ssd1306: 'จอ OLED 0.96" 128x64 (SSD1306)', sh1106: 'จอ OLED 1.3" 128x64 (SH1106)', ssd1306_32: 'จอ OLED 0.91" 128x32 (SSD1306)' };
+  const lcdB = blocks.find(b => b.type === 'lcd_begin');
+  const lcdSize = lcdB ? sf(lcdB, 'SIZE').replace(/,\s*/, 'x') : '16x2';
+  let hasOled = false, hasLcd = false;
+
+  for (const b of blocks) {
+    const t = b.type;
+    if (t.startsWith('oled_') && t !== 'oled_width') { hasOled = true; continue; }
+    if (t === 'oled_width') { hasOled = true; continue; }
+    if (t.startsWith('lcd_')) { hasLcd = true; continue; }
+    switch (t) {
+      case 'board_led': onboard.led = true; break;
+      case 'board_boot': onboard.boot = true; break;
+      case 'io_pin_mode': {
+        const p = gf(b, 'PIN');
+        if (sf(b, 'MODE') === 'OUTPUT' && p >= 34) extra.push({ level: 'error', text: 'ขา ' + silk(p) + ' ตั้งเป็นขาส่งออกไม่ได้ (เป็นขาอ่านอย่างเดียว) — โปรแกรมจะ error ให้เปลี่ยนไปใช้ขาอื่น' });
+        if (sf(b, 'MODE') === 'OUTPUT' && p === 0) extra.push({ level: 'warn', text: 'ขา GPIO0 คือปุ่ม BOOT บนบอร์ด ไม่ควรตั้งเป็นขาส่งออก' });
+        break;
+      }
+      case 'io_digital_write': case 'io_digital_toggle': addLed(gf(b, 'PIN')); break;
+      case 'io_digital_write_n': {
+        let found = false;
+        const direct = b.getInputTargetBlock('PIN');
+        if (direct && direct.type === 'math_number') { addLed(Number(direct.getFieldValue('NUM'))); found = true; }
+        for (const l of blocks.filter(x => x.type === 'lists_create_with')) {
+          const nums = l.getChildren(false).filter(c => c.type === 'math_number').map(c => Number(c.getFieldValue('NUM')));
+          if (nums.length && nums.every(n => OUT_PINS.includes(n))) { nums.forEach(addLed); found = true; }
+        }
+        if (!found) extra.push({ level: 'info', text: 'บล็อก digitalWrite ที่ใช้เลขขาจากตัวแปร — ระบบบอกการต่อสายให้ไม่ได้ ให้ดูคำอธิบายของตัวอย่าง' });
+        break;
+      }
+      case 'io_digital_read': case 'io_digital_is_high': {
+        const p = gf(b, 'PIN');
+        if (p === 0) { onboard.boot = true; break; }
+        put('in:' + p, mk('ปุ่มกด / สวิตช์ / เซนเซอร์ดิจิทัล', 'ปุ่ม', '🔘', 'input', [wire('ขาที่ 1', G(p)), wire('ขาที่ 2', PW('GND'))],
+          { notes: ['ปุ่มกด: ใช้บล็อก pinMode ตั้งขานี้เป็น INPUT_PULLUP แล้วกดจะอ่านได้ 0 (LOW)'] }));
+        break;
+      }
+      case 'io_analog_read': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'เซนเซอร์อนาล็อก / ตัวต้านทานปรับค่า', 'อนาล็อก', '🎚',
+          [wire('ขากลาง / AO', G(p)), wire('ขาข้าง 1 / VCC', PW('3V3')), wire('ขาข้าง 2 / GND', PW('GND'))],
+          { notes: ['ตัวต้านทานปรับค่า (โพเทนชิโอมิเตอร์) 10kΩ: ขากลางเข้าบอร์ด ขาข้างสองขาไป 3.3V กับ GND'] });
+        break;
+      }
+      case 'io_pwm': {
+        const p = gf(b, 'PIN');
+        if (p === 2) { onboard.led = true; break; }
+        put('pwm:' + p, mk('LED / อุปกรณ์ที่ปรับความแรงได้ (PWM)', 'PWM', '💡', 'actuator', [wire('ขา +', G(p), 'ผ่านตัวต้านทาน 220Ω (ถ้าเป็น LED)'), wire('ขา −', PW('GND'))],
+          { pwm: 1, parts: ['ตัวต้านทาน 220Ω (ต่อกับ LED)'], notes: ['มอเตอร์/หลอดไฟแรง ๆ ห้ามต่อตรง ต้องผ่านบอร์ดขับหรือทรานซิสเตอร์'] }));
+        break;
+      }
+      case 'io_touch_read': {
+        const p = gf(b, 'PIN');
+        put('touch:' + p, mk('แผ่นสัมผัส (สายไฟ / แผ่นโลหะ)', 'สัมผัส', '👆', 'input', [wire('สายไฟ / แผ่นโลหะ', G(p))], { notes: ['แตะที่ปลายสายเปล่า ค่าที่อ่านได้จะลดลง'] }));
+        break;
+      }
+
+      // ---- I2C sensors
+      case 'sens_aht20': i2cDev('aht', 'AHT20 / AHT10 (อุณหภูมิ ความชื้น)', 'AHT20', '🌡', 'sensor', '3V3'); break;
+      case 'sens_sht31': i2cDev('sht', 'SHT31 (อุณหภูมิ ความชื้น)', 'SHT31', '🌡', 'sensor', '3V3'); break;
+      case 'sens_bme280': i2cDev('bme', 'BME280 / BMP280 (อุณหภูมิ ความชื้น ความดัน)', 'BME280', '🌤', 'sensor', '3V3'); break;
+      case 'sens_bh1750': i2cDev('bh', 'BH1750 (ความสว่าง)', 'BH1750', '☀️', 'sensor', '3V3'); break;
+      case 'sens_mpu_accel': case 'sens_mpu_gyro': case 'sens_mpu_angle': i2cDev('mpu', 'MPU6050 (เอียง / สั่น)', 'MPU6050', '🧭', 'sensor', '3V3'); break;
+      case 'i2c_scan': case 'i2c_read_reg': case 'i2c_write_reg': i2cDev('any', 'อุปกรณ์ I2C', 'I2C', '🔗', 'sensor', '3V3'); break;
+
+      // ---- one-wire / digital / analog sensors
+      case 'sens_dht': {
+        const p = gf(b, 'PIN'), ty = sf(b, 'TYPE') === 'dht11' ? 'DHT11' : 'DHT22';
+        put('dht:' + p, mk(ty + ' (อุณหภูมิ ความชื้น)', ty, '💧', 'sensor',
+          [wire('DATA / OUT', G(p)), wire('VCC / +', PW('3V3')), wire('GND / −', PW('GND'))],
+          { parts: ['ตัวต้านทาน 10kΩ (เฉพาะตัวเปล่า 4 ขา)'], fix: ['ตัวเปล่า 4 ขา: ต่อตัวต้านทาน 10kΩ ระหว่างขา DATA กับ VCC (โมดูล 3 ขามีมาให้แล้ว)'] }));
+        break;
+      }
+      case 'sens_ds18b20': case 'sens_ds18b20_count': {
+        const p = gf(b, 'PIN');
+        put('ds:' + p, mk('DS18B20 (อุณหภูมิ แบบกันน้ำ)', 'DS18B20', '🌡', 'sensor',
+          [wire('DATA (สายเหลือง)', G(p)), wire('VDD (สายแดง)', PW('3V3')), wire('GND (สายดำ)', PW('GND'))],
+          { parts: ['ตัวต้านทาน 4.7kΩ'], fix: ['ตัวต้านทาน 4.7kΩ ต่อระหว่างสาย DATA กับ 3.3V (โมดูลที่มีบอร์ดรองมักใส่มาให้แล้ว)'],
+            notes: ['ต่อได้หลายตัวพ่วงสาย DATA เส้นเดียวกัน ใช้ตัวต้านทานตัวเดียว'] }));
+        break;
+      }
+      case 'sens_ultrasonic': {
+        const tr = gf(b, 'TRIG'), ec = gf(b, 'ECHO');
+        put('us:' + tr + '-' + ec, mk('HC-SR04 (วัดระยะด้วยคลื่นเสียง)', 'HC-SR04', '📏', 'sensor',
+          [wire('VCC', PW('5V')), wire('Trig', G(tr)), wire('Echo', G(ec), 'ผ่านตัวแบ่งแรงดัน 1kΩ + 2kΩ'), wire('GND', PW('GND'))],
+          { parts: ['ตัวต้านทาน 1kΩ', 'ตัวต้านทาน 2kΩ'],
+            fix: ['Echo → ตัวต้านทาน 1kΩ → ขา ' + silk(ec) + ' และจากขา ' + silk(ec) + ' → ตัวต้านทาน 2kΩ → GND (ลดสัญญาณ 5V เหลือ 3.3V)'],
+            notes: ['รุ่น HC-SR04P / RCWL-1601 ใช้ไฟ 3.3V ต่อ Echo ตรง ๆ ได้ ไม่ต้องใช้ตัวต้านทาน'] }));
+        break;
+      }
+      case 'sens_pir': {
+        const p = gf(b, 'PIN');
+        put('pir:' + p, mk('PIR ตรวจจับการเคลื่อนไหว (HC-SR501 / AM312)', 'PIR', '🚶', 'sensor',
+          [wire('VCC', PW('5V'), 'HC-SR501 = 5V · AM312 = 3.3V'), wire('OUT', G(p)), wire('GND', PW('GND'))],
+          { notes: ['หลังเปิดไฟ HC-SR501 ต้องรอประมาณ 1 นาทีให้เซนเซอร์นิ่ง ช่วงแรกอาจแจ้งว่ามีการเคลื่อนไหวเอง'] }));
+        break;
+      }
+      case 'sens_soil': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'เซนเซอร์ความชื้นในดิน', 'ดิน', '🌱', [wire('AOUT', G(p)), wire('VCC', PW('3V3')), wire('GND', PW('GND'))],
+          { notes: ['ต้องปรับเทียบค่า dry/wet ก่อนใช้ (ดูตัวอย่าง "ปรับเทียบเซนเซอร์ความชื้นดิน")'] }, true);
+        break;
+      }
+      case 'sens_light': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'โมดูลวัดแสง LDR', 'LDR', '☀️', [wire('AO', G(p)), wire('VCC', PW('3V3')), wire('GND', PW('GND'))], {}, true);
+        break;
+      }
+      case 'sens_rain': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'เซนเซอร์ฝน (บอร์ด FC-37 / YL-83)', 'ฝน', '🌧', [wire('AO', G(p)), wire('VCC', PW('3V3'), 'ใช้ 3.3V ไม่ใช่ 5V'), wire('GND', PW('GND'))],
+          { notes: ['ใช้ไฟ 3.3V เพื่อให้สัญญาณ AO ไม่เกิน 3.3V (ที่ 5V อาจทำให้ขาบอร์ดเสียหาย)'] }, true);
+        break;
+      }
+      case 'sens_water': {
+        const p = gf(b, 'PIN'), pw = gf(b, 'POWER');
+        analogDev(p, 'เซนเซอร์ระดับน้ำ (แผ่น 3 ขา)', 'ระดับน้ำ', '🚰',
+          [wire('S (สัญญาณ)', G(p)), pw >= 0 ? wire('+ (ไฟ)', G(pw), 'จ่ายไฟเฉพาะตอนวัด กันแผ่นผุ') : wire('+ (ไฟ)', PW('3V3')), wire('− (GND)', PW('GND'))],
+          { notes: ['วัดได้เฉพาะช่วงความยาวของแผ่น · ปรับเทียบค่า empty/full ให้ตรงกับน้ำที่ใช้'] }, true);
+        break;
+      }
+      case 'sens_percent': case 'sens_raw': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'เซนเซอร์อนาล็อก', 'อนาล็อก', '🎚', [wire('AO / สัญญาณ', G(p)), wire('VCC', PW('3V3')), wire('GND', PW('GND'))]);
+        break;
+      }
+      case 'sens_mq_level': case 'sens_mq_ppm': case 'sens_mq_volt': case 'sens_mq_cal': {
+        const p = gf(b, 'PIN');
+        analogDev(p, 'เซนเซอร์แก๊ส MQ-2 (ผ่านตัวแบ่งแรงดัน)', 'MQ-2', '🔥',
+          [wire('VCC', PW('5V')), wire('AO', G(p), 'ผ่านตัวต้านทาน 10kΩ'), wire('GND', PW('GND'))],
+          { parts: ['ตัวต้านทาน 10kΩ', 'ตัวต้านทาน 20kΩ'],
+            fix: ['AO → ตัวต้านทาน 10kΩ → ขา ' + silk(p) + ' และจากขา ' + silk(p) + ' → ตัวต้านทาน 20kΩ → GND (ลด 5V เหลือ 3.3V)', 'ห้ามต่อขา DO เข้าบอร์ดตรง ๆ (สัญญาณ 5V)'],
+            notes: ['อุ่นเซนเซอร์ 1-3 นาทีหลังเปิดไฟ', '⚠ ใช้เพื่อการเรียนรู้ ไม่ใช่เครื่องตรวจแก๊สที่ได้มาตรฐาน'] }, true);
+        break;
+      }
+
+      // ---- outputs
+      case 'act_tone': case 'act_notone': {
+        const p = gf(b, 'PIN');
+        put('buzzer:' + p, mk('บัซเซอร์ (แบบ passive)', 'บัซเซอร์', '🔔', 'actuator', [wire('ขา +', G(p)), wire('ขา −', PW('GND'))],
+          { pwm: 1, notes: ['ต้องเป็นบัซเซอร์แบบ passive (ไม่ร้องเองเมื่อจ่ายไฟ) · แบบ active ใช้ digitalWrite แทน'] }));
+        break;
+      }
+      case 'act_servo': {
+        const p = gf(b, 'PIN');
+        put('servo:' + p, mk('เซอร์โว SG90 / MG90S', 'เซอร์โว', '🦾', 'actuator',
+          [wire('สัญญาณ (สายส้ม/เหลือง)', G(p)), wire('VCC (สายแดง)', PW('5V'), 'ใช้ 5V ไม่ใช่ 3.3V'), wire('GND (สายน้ำตาล)', PW('GND'))],
+          { pwm: 1, notes: ['ถ้าเซอร์โวหมุนแล้วบอร์ดรีเซ็ตเอง ให้เลี้ยงเซอร์โวด้วยแหล่งไฟ 5V แยก (ต่อ GND ร่วมกับบอร์ด)'] }));
+        break;
+      }
+      case 'act_relay': {
+        const p = gf(b, 'PIN');
+        put('relay:' + p, mk('โมดูลรีเลย์', 'รีเลย์', '🔌', 'actuator', [wire('IN', G(p)), wire('VCC', PW('5V')), wire('GND', PW('GND'))],
+          { notes: ['โมดูลส่วนใหญ่ทำงานเมื่อสัญญาณเป็น LOW (LOW-trigger) — ถ้ารีเลย์ติด/ดับกลับด้าน ให้เปลี่ยนตัวเลือกในบล็อก',
+                    '⚠ ไฟบ้าน 220V อันตรายถึงชีวิต ให้ผู้มีความรู้เป็นคนต่อ'] }));
+        break;
+      }
+      case 'act_motor': case 'act_motor_stop': {
+        const a = gf(b, 'IN1'), c = gf(b, 'IN2'), e = gf(b, 'EN');
+        const w = [wire('IN1', G(a)), wire('IN2', G(c))];
+        if (e >= 0) w.push(wire('EN / PWM (ENA)', G(e)));
+        w.push(wire('GND ของบอร์ดขับ', PW('GND'), 'ต่อ GND ร่วมกับ ESP32'));
+        put('motor:' + a + '-' + c, mk('มอเตอร์ DC ผ่านบอร์ดขับ (L9110S / L298N / DRV8833)', 'มอเตอร์', '⚙️', 'actuator', w,
+          { pwm: e >= 0 ? 1 : 2, parts: ['บอร์ดขับมอเตอร์', 'แหล่งไฟสำหรับมอเตอร์ (ถ่านหรืออะแดปเตอร์)'],
+            fix: ['ไฟเลี้ยงมอเตอร์ต่อจากแหล่งไฟภายนอกเข้าบอร์ดขับ — ไม่ดึงจากขา 3.3V/VIN ของ ESP32'],
+            notes: ['ห้ามต่อมอเตอร์เข้าขาของ ESP32 ตรง ๆ'] }));
+        break;
+      }
+    }
+  }
+  if (hasOled) i2cDev('oled', OLED_NAME[oledType] || OLED_NAME.ssd1306, 'OLED', '📺', 'display', '3V3',
+    { notes: ['จอ OLED บางรุ่นมี 4 ขา เรียง GND VCC SCL SDA — ดูตัวหนังสือบนจอให้ดี ลำดับไม่เหมือนกันทุกรุ่น'] });
+  if (hasLcd) i2cDev('lcd', 'จอ LCD ' + lcdSize + ' + บอร์ด I2C (PCF8574)', 'LCD', '🔲', 'display', '5V',
+    { notes: ['จอ LCD ใช้ไฟ 5V', 'จอติดแต่ไม่เห็นตัวอักษร (เป็นแถบสี่เหลี่ยม): หมุนตัวต้านทานปรับความเข้มสีฟ้าหลังจอ'] });
+  if (devs.has('i2c:any') && [...devs.keys()].some(k => k.startsWith('i2c:') && k !== 'i2c:any')) devs.delete('i2c:any');
+
+  const devices = [...devs.values()];
+  devices.forEach((d, i) => { d.color = SIGNAL_COLORS[i % SIGNAL_COLORS.length]; });
+
+  // pins and power rails in use
+  const usage = new Map(), rails = new Map();
+  for (const d of devices) for (const w of d.wires) {
+    if (w.to.gpio != null) { if (!usage.has(w.to.gpio)) usage.set(w.to.gpio, []); usage.get(w.to.gpio).push({ dev: d, w }); }
+    else { if (!rails.has(w.to.rail)) rails.set(w.to.rail, []); if (!rails.get(w.to.rail).includes(d)) rails.get(w.to.rail).push(d); }
+  }
+
+  const warnings = [...extra];
+  for (const [g, list] of usage) {
+    const ds = [...new Set(list.map(u => u.dev))];
+    const sharedOk = ds.length > 1 && ds.every(d => d.shared === 'i2c') && list.every(u => u.w.role === list[0].w.role);
+    if (ds.length > 1 && !sharedOk)
+      warnings.push({ level: 'error', pin: g, text: 'ขา ' + silk(g) + ' ถูกใช้ซ้ำโดย ' + ds.map(d => d.short).join(' และ ') + ' — แต่ละอุปกรณ์ต้องใช้คนละขา ให้เปลี่ยนขาในบล็อกของตัวใดตัวหนึ่ง' });
+    if (PIN_WARN[g]) warnings.push({ level: 'warn', pin: g, text: PIN_WARN[g] });
+    if (PIN_INFO[g] && PIN_INFO[g].role === 'bad') warnings.push({ level: 'error', pin: g, text: 'ขา ' + silk(g) + ' ใช้สื่อสารกับ USB อยู่ ห้ามใช้ต่ออุปกรณ์' });
+  }
+  const pwmPins = new Set();
+  for (const d of devices) if (d.pwm) for (const w of d.wires) if (w.to.gpio != null && !/^GND|^VCC|^ขา −/.test(w.pin) && /^(ขา \+|สัญญาณ|IN1|IN2|EN)/.test(w.pin)) pwmPins.add(w.to.gpio);
+  if (pwmPins.size > 8) warnings.push({ level: 'error', text: 'ใช้ PWM / บัซเซอร์ / เซอร์โว / มอเตอร์ รวม ' + pwmPins.size + ' ขา — บอร์ดรองรับพร้อมกันได้ไม่เกิน 8 ขา' });
+  if (rails.has('5V')) warnings.push({ level: 'info', text: 'อุปกรณ์ที่ใช้ไฟ 5V (' + rails.get('5V').map(d => d.short).join(', ') + ') ต่อที่ขา VIN ของบอร์ด — ขานี้ให้ 5V เมื่อเสียบสาย USB' });
+  if (devices.some(d => d.short === 'มอเตอร์' || d.short === 'เซอร์โว' || d.short === 'รีเลย์'))
+    warnings.push({ level: 'info', text: 'มอเตอร์ / เซอร์โว / ปั๊ม กินกระแสสูง ควรใช้แหล่งไฟแยก ไม่ดึงจากบอร์ด ESP32 โดยตรง และต้องต่อ GND ร่วมกับบอร์ดเสมอ' });
+  if (devices.some(d => d.shared === 'i2c'))
+    warnings.push({ level: 'info', text: 'อุปกรณ์ I2C ทุกตัวต่อพ่วงบนสาย SDA/SCL ชุดเดียวกันได้ — ใช้ตัวอย่าง "ค้นหาอุปกรณ์ I2C" เช็กว่าบอร์ดเห็นครบทุกตัว' });
+
+  const parts = [...new Set(devices.flatMap(d => d.parts))];
+  return { devices, onboard, usage, rails, warnings, parts, blocks: blocks.length };
+}
+
+// the analysis of a saved example (headless workspace; comment icons are not needed for this)
+function analyzeState(state) {
+  const hw = new Blockly.Workspace();
+  try {
+    const clean = JSON.parse(JSON.stringify(state), (k, v) => (k === 'icons' ? undefined : v));
+    Blockly.serialization.workspaces.load(clean, hw);
+    return analyzeBlocks(hw.getAllBlocks(false));
+  } finally { hw.dispose(); }
+}
+
+// ================================================================== UX part 2: board drawing
+const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const shortWire = p => p.split(/[ (/]/)[0];
+
+// mode 'use': highlight the pins the program uses, with what is attached; 'ref': colour by usability
+function boardSvg(an, mode) {
+  const ref = mode === 'ref';
+  const x0 = 176, x1 = 344, y0 = 56, dy = 26, W = 620, H = 500;      // board drawn at x 176-344, shifted 50 to the right (room for labels)
+  let s = '<svg class="boardsvg" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="แผนผังขา ' + BOARD30.name + '"><g transform="translate(50 0)">';
+  s += '<rect class="pcb" x="' + x0 + '" y="20" width="' + (x1 - x0) + '" height="450" rx="18"/>';
+  s += '<rect class="mod" x="206" y="36" width="108" height="100" rx="6"/><text class="modt" x="260" y="92">ESP32</text>';
+  s += '<path class="ant" d="M214 152h14v-9h14v9h14v-9h14v9h14v-9h14v9h8"/>';
+  s += '<circle class="btn" cx="208" cy="446" r="8"/><text class="btnt" x="208" y="466">EN</text>';
+  s += '<circle class="btn" cx="312" cy="446" r="8"/><text class="btnt" x="312" y="466">BOOT</text>';
+  s += '<rect class="usb" x="236" y="462" width="48" height="30" rx="4"/><text class="usbt" x="260" y="481">USB</text>';
+
+  const style = id => {
+    if (typeof id === 'number') {
+      if (ref) { const i = PIN_INFO[id]; return { fill: ROLE_COLOR[i ? i.role : 'power'], note: i ? i.note : '', noteColor: i && i.role === 'bad' ? '#dc2626' : i && i.role === 'warn' ? '#b45309' : '#64748b' }; }
+      const list = an ? an.usage.get(id) : null;
+      if (!list) return { fill: '#334155', note: '' };
+      const ds = [], seen = new Set();
+      for (const u of list) if (!seen.has(u.dev)) { seen.add(u.dev); ds.push(u); }
+      const clash = ds.length > 1 && !ds.every(u => u.dev.shared === 'i2c');
+      const role = list[0].w.role;
+      let label = ds.map(u => u.dev.short).join(' + ');
+      if (role === 'sda' || role === 'scl') label = role.toUpperCase() + ' · ' + label;
+      else if (ds.length === 1) label = label + ' · ' + shortWire(ds[0].w.pin);
+      return { fill: clash ? '#ef4444' : wireColor(list[0].w, list[0].dev), note: (clash ? '⚠ ' : '') + label, used: true, clash, noteColor: '#172033' };
+    }
+    const rail = id === '3v3' ? '3V3' : id === '5v' ? '5V' : id === 'gnd' ? 'GND' : null;
+    if (!rail) return { fill: '#94a3b8', note: ref ? 'รีเซ็ตบอร์ด' : '', noteColor: '#64748b' };
+    if (ref) return { fill: '#94a3b8', note: rail === 'GND' ? 'กราวด์ (ขั้วลบ)' : rail === '5V' ? 'ไฟ 5V (จาก USB)' : 'ไฟ 3.3V', noteColor: '#64748b' };
+    if (rail === 'GND') return an && an.devices.length ? { fill: RAILS.GND.color, note: 'GND (ต่อร่วมกัน)', used: true, noteColor: '#172033' } : { fill: '#334155', note: '' };
+    const ds = an ? an.rails.get(rail) : null;
+    return ds ? { fill: RAILS[rail].color, note: RAILS[rail].text + ' · ' + ds.map(d => d.short).join(' + '), used: true, noteColor: '#172033' } : { fill: '#334155', note: '' };
+  };
+  const side = (sd, list) => list.forEach(([lab, id], i) => {
+    const x = sd === 'L' ? x0 : x1, y = y0 + i * dy, st = style(id);
+    const sign = sd === 'L' ? -1 : 1;
+    if (st.note) {
+      const lx = x + sign * 26, tx = sd === 'L' ? 150 : 374;
+      s += '<line x1="' + (x + sign * 9) + '" y1="' + y + '" x2="' + lx + '" y2="' + y + '" stroke="' + (ref ? '#cbd5e1' : st.fill) + '" stroke-width="' + (st.used ? 3 : 1.5) + '"/>';
+      s += '<text class="pl' + (st.clash ? ' clash' : '') + '" x="' + (sd === 'L' ? 146 : 378) + '" y="' + (y + 4.5) + '" text-anchor="' + (sd === 'L' ? 'end' : 'start') + '"' +
+           (ref ? ' style="fill:' + st.noteColor + ';font-weight:500;font-size:11.5px"' : '') + '>' + xmlEsc(trunc(st.note, ref ? 30 : 26)) + '</text>';
+    }
+    s += '<circle cx="' + x + '" cy="' + y + '" r="' + (st.used ? 9 : 7.5) + '" fill="' + st.fill + '" stroke="' + (st.clash ? '#fecaca' : '#e2e8f0') + '" stroke-width="' + (st.used ? 2.5 : 1) + '"/>';
+    const g = typeof id === 'number' && silk(id) !== 'D' + id ? lab + ' · ' + id : lab;
+    s += '<text class="pn" x="' + (x + sign * -17) + '" y="' + (y + 4) + '" text-anchor="' + (sd === 'L' ? 'start' : 'end') + '">' + xmlEsc(g) + '</text>';
+  });
+  side('L', BOARD30.left); side('R', BOARD30.right);
+  return s + '</g></svg>';
+}
+
+function legendChips() {
+  const chip = (c, t) => '<span class="lg"><i style="background:' + c + '"></i>' + t + '</span>';
+  return '<div class="legend">' + chip(ROLE_COLOR.ok, 'ใช้ได้ทั่วไป') + chip(ROLE_COLOR.warn, 'ใช้ได้แต่ระวังตอนเปิดเครื่อง') + chip(ROLE_COLOR.input, 'อ่านอย่างเดียว (เซนเซอร์อนาล็อก)') +
+    chip(ROLE_COLOR.bad, 'ห้ามใช้ (สาย USB)') + chip(ROLE_COLOR.power, 'ไฟ / รีเซ็ต') + '</div>';
+}
+
+// ================================================================== UX part 3: wiring tab, gallery, welcome, block search, tools
+function emptyCard(icon, title, text) {
+  return el('div', { className: 'wempty' }, el('div', { className: 'wicon', textContent: icon }), el('b', { textContent: title }), el('p', { textContent: text }));
+}
+
+function pinCell(to) {
+  if (to.gpio != null) return el('span', { className: 'bp' }, el('b', { textContent: silk(to.gpio) }), silk(to.gpio) !== 'D' + to.gpio ? el('small', { textContent: 'GPIO' + to.gpio }) : null);
+  return el('span', { className: 'bp rail' }, el('b', { textContent: RAILS[to.rail].pin.replace('ขา ', '') }));
+}
+
+function deviceCard(d) {
+  const rows = d.wires.map(w => el('tr', null,
+    el('td', { className: 'wc' }, el('span', { className: 'wsw', style: 'background:' + wireColor(w, d) })),
+    el('td', { className: 'wp', textContent: w.pin }),
+    el('td', { className: 'wa', textContent: '→' }),
+    el('td', { className: 'wt' }, pinCell(w.to), w.via ? el('div', { className: 'via', textContent: w.via }) : null)));
+  return el('div', { className: 'dev', style: '--c:' + d.color },
+    el('div', { className: 'dev-h' }, el('span', { className: 'dev-i', textContent: d.icon }), el('b', { textContent: d.name }), el('span', { className: 'dev-k', textContent: KIND_TEXT[d.kind] || '' })),
+    el('table', { className: 'wires' }, el('tbody', null, ...rows)),
+    ...d.fix.map(t => el('div', { className: 'fix', textContent: '🔧 ' + t })),
+    ...d.notes.map(t => el('div', { className: 'dnote', textContent: 'ⓘ ' + t })));
+}
+
+function renderWiring() {
+  const pane = $('wiringPane');
+  pane.replaceChildren();
+  if (manual) { pane.append(emptyCard('✎', 'โหมดโค้ดเขียนเอง', 'หน้านี้อ่านการต่อสายจากบล็อกเท่านั้น — กลับไปใช้บล็อกเพื่อดูวิธีต่อสาย หรือเปิด "แผนผังขา ESP32" ดูว่าขาไหนใช้ได้')); }
+  const an = currentAnalysis;
+  if (manual || !an) { pane.append(pinoutButtons()); return; }
+
+  if (lastExample) {
+    const notes = exampleNotes(lastExample.state);
+    pane.append(el('div', { className: 'wcard exnote' }, el('b', { textContent: '📘 ' + lastExample.title }), ...notes.flatMap(n => n.split('\n')).map(l => el('div', { textContent: l }))));
+  }
+  const ext = an.devices;
+  if (!ext.length) {
+    const what = an.onboard.led || an.onboard.boot ? 'ใช้เฉพาะของบนบอร์ด' + (an.onboard.led ? ' (LED สีฟ้าที่ขา D2)' : '') + (an.onboard.boot ? (an.onboard.led ? ' และ' : '') + ' ปุ่ม BOOT' : '') : 'ยังไม่มีบล็อกที่ต้องต่ออุปกรณ์';
+    pane.append(emptyCard('✅', 'ไม่ต้องต่อสายเพิ่ม', what + ' — ลากบล็อกเซนเซอร์ จอ หรือรีเลย์ แล้วหน้านี้จะบอกวิธีต่อสายให้เอง'));
+    pane.append(pinoutButtons());
+    return;
+  }
+  const usedPins = [...an.usage.keys()].map(silk);
+  pane.append(el('div', { className: 'wsum' },
+    el('b', { textContent: 'ต้องต่อ ' + ext.length + ' อย่าง' }),
+    el('span', { textContent: usedPins.length ? 'ใช้ขา ' + usedPins.join(', ') : '' }),
+    el('span', { textContent: [...an.rails.keys()].map(r => RAILS[r].text).join(' · ') })));
+  for (const w of an.warnings.filter(w => w.level === 'error')) pane.append(el('div', { className: 'wwarn err', textContent: '⛔ ' + w.text }));
+  for (const w of an.warnings.filter(w => w.level === 'warn')) pane.append(el('div', { className: 'wwarn warn', textContent: '⚠️ ' + w.text }));
+
+  const diag = el('div', { className: 'wcard diag' });
+  diag.innerHTML = boardSvg(an, 'use');
+  const big = el('button', { className: 'mini', textContent: '🔍 ขยายแผนผัง', onclick: () => showBoardDialog(an) });
+  pane.append(el('div', { className: 'wh' }, el('b', { textContent: '🗺 แผนผังบอร์ด (' + BOARD30.name + ')' }), big), diag,
+    el('div', { className: 'wnote', textContent: 'ลำดับขาตามบอร์ด DOIT DevKit V1 30 ขา · ถ้าบอร์ดของคุณต่างออกไป ให้ดูตัวเลขที่พิมพ์ข้างขาบนบอร์ด (เช่น D27)' }));
+
+  pane.append(el('div', { className: 'wh' }, el('b', { textContent: '🔌 วิธีต่อสายทีละอุปกรณ์' })));
+  for (const d of ext) pane.append(deviceCard(d));
+  if (an.onboard.led || an.onboard.boot) pane.append(el('div', { className: 'wnote', textContent: 'บนบอร์ด: ' + [an.onboard.led ? 'LED สีฟ้า (ขา D2)' : '', an.onboard.boot ? 'ปุ่ม BOOT' : ''].filter(Boolean).join(' และ ') + ' — ไม่ต้องต่อสาย' }));
+
+  const shopping = [...ext.map(d => d.name), ...an.parts, 'สายจัมเปอร์ (และเขียงทดลอง breadboard ถ้าต่อหลายอย่าง)'];
+  pane.append(el('div', { className: 'wh' }, el('b', { textContent: '🛒 ของที่ต้องเตรียม' })),
+    el('ul', { className: 'wlist' }, ...[...new Set(shopping)].map(t => el('li', { textContent: t }))));
+  const infos = an.warnings.filter(w => w.level === 'info');
+  if (infos.length) pane.append(el('div', { className: 'wh' }, el('b', { textContent: '💡 ข้อควรรู้' })), ...infos.map(w => el('div', { className: 'wwarn info', textContent: w.text })));
+  pane.append(pinoutButtons());
+}
+
+function pinoutButtons() {
+  return el('div', { className: 'wfoot' }, el('button', { className: 'mini', textContent: '📍 แผนผังขา ESP32 ทั้งหมด (ขาไหนใช้ได้)', onclick: showPinout }));
+}
+
+function showBoardDialog(an) {
+  const box = el('div', { className: 'bigdiag' });
+  box.innerHTML = boardSvg(an, 'use');
+  dlg.classList.add('wide');
+  dialog('🗺 แผนผังการต่อสาย', [box, el('div', { className: 'wnote', textContent: 'จุดสีบนบอร์ด = ขาที่ใช้ · เส้นชี้ไปที่ชื่ออุปกรณ์ที่ต่ออยู่ · สีเดียวกับในการ์ดของแต่ละอุปกรณ์' })], [['ปิด', null]]).then(() => dlg.classList.remove('wide'));
+}
+
+function showPinout() {
+  const box = el('div', { className: 'bigdiag' });
+  box.innerHTML = boardSvg(null, 'ref');
+  const tips = el('div', { className: 'tips' },
+    el('p', null, el('b', { textContent: 'ขาที่แนะนำสำหรับมือใหม่: ' }), 'D4, D5, D13, D14, D16, D17, D18, D19, D23, D25, D26, D27, D32, D33 (ส่งสัญญาณออกได้ ไม่มีปัญหาตอนเปิดเครื่อง)'),
+    el('p', null, el('b', { textContent: 'อ่านเซนเซอร์อนาล็อก: ' }), 'D32, D33, D34, D35, VP(36), VN(39) เท่านั้น — ขาอนาล็อกอื่นใช้ไม่ได้เมื่อเปิด WiFi (ซึ่งบอร์ดนี้เปิดตลอด)'),
+    el('p', null, el('b', { textContent: 'I2C (จอ, เซนเซอร์หลายตัว): ' }), 'SDA = D21, SCL = D22 ต่อพ่วงได้หลายอุปกรณ์สายชุดเดียว'),
+    el('p', null, el('b', { textContent: 'ไฟ: ' }), '3V3 = 3.3 โวลต์ (เซนเซอร์ส่วนใหญ่) · VIN = 5 โวลต์ (เซอร์โว รีเลย์ จอ LCD) · GND ต่อร่วมกันทุกอุปกรณ์'));
+  dlg.classList.add('wide');
+  dialog('📍 แผนผังขา ESP32 — ขาไหนใช้ทำอะไรได้', [box, el('div', { innerHTML: legendChips() }), tips,
+    el('div', { className: 'wnote', textContent: 'ลำดับขาตามบอร์ด ' + BOARD30.name + ' · ตัวเลขข้างขาคือเลขที่พิมพ์บนบอร์ด' })], [['ปิด', null]]).then(() => dlg.classList.remove('wide'));
+}
+
+function showRight(name) {
+  rightTab = name;
+  $('rtConsole').classList.toggle('on', name === 'console');
+  $('rtWiring').classList.toggle('on', name === 'wiring');
+  $('consoleWrap').style.display = name === 'console' ? '' : 'none';
+  $('wiringPane').classList.toggle('on', name === 'wiring');
+  $('clr').style.visibility = name === 'console' ? '' : 'hidden';
+  if (name === 'wiring') renderWiring();
+}
+$('rtConsole').onclick = () => showRight('console');
+$('rtWiring').onclick = () => showRight('wiring');
+
+function refreshWiring() {
+  if (!ws) return;
+  currentAnalysis = manual ? null : analyzeBlocks(ws.getAllBlocks(false));
+  const n = currentAnalysis ? currentAnalysis.devices.length : 0;
+  const bad = currentAnalysis ? currentAnalysis.warnings.filter(w => w.level === 'error' || w.level === 'warn').length : 0;
+  const badge = $('wireBadge');
+  badge.textContent = n ? String(n) : '';
+  badge.className = 'badge' + (n ? '' : ' hide') + (bad ? ' warn' : '');
+  if (rightTab === 'wiring') renderWiring();
+}
+function scheduleWiring() { clearTimeout(wiringTimer); wiringTimer = setTimeout(refreshWiring, 250); }
+
+// ------------------------------------------------------------------ example gallery
+const exMeta = [];
+function metaOf(i) {
+  if (!exMeta[i]) {
+    let an;
+    try { an = analyzeState(EXAMPLES[i][1]); } catch (e) { an = { devices: [], onboard: {}, blocks: 0, warnings: [], parts: [] }; }
+    const lines = exampleNotes(EXAMPLES[i][1]).flatMap(n => n.split('\n')).map(l => l.trim()).filter(Boolean);
+    const about = lines.find(l => !/→|GPIO|VCC/.test(l)) || '';
+    const icon = an.devices.length ? an.devices[0].icon : an.onboard.led ? '💡' : an.onboard.boot ? '🔘' : '🧪';
+    exMeta[i] = { an, about: trunc(about.replace(/^[·\s]+/, ''), 96), icon, level: an.blocks < 14 ? 1 : an.blocks < 32 ? 2 : 3 };
+  }
+  return exMeta[i];
+}
+
+const FILTERS = [['all', 'ทั้งหมด'], ['none', '✅ ไม่ต้องต่ออะไร'], ['sensor', '🌡 เซนเซอร์'], ['display', '📺 จอแสดงผล'], ['actuator', '🔔 เสียง / มอเตอร์ / รีเลย์'], ['input', '🎚 ปุ่ม / ปรับค่า']];
+
+async function openGallery() {
+  if (!ws) return;
+  let filter = 'all', query = '', picked = null;
+  const grid = el('div', { className: 'gal-grid' });
+  const chips = el('div', { className: 'chips' });
+  const search = el('input', { type: 'text', placeholder: '🔍 ค้นหา เช่น แก๊ส มอเตอร์ จอ ฝน', className: 'gal-search', autocomplete: 'off' });
+  const count = el('div', { className: 'muted gal-count' });
+  const render = () => {
+    grid.replaceChildren();
+    let n = 0;
+    EXAMPLES.forEach(([title], i) => {
+      const m = metaOf(i), an = m.an;
+      const okF = filter === 'all' || (filter === 'none' ? !an.devices.length : an.devices.some(d => d.kind === filter));
+      const hay = (title + ' ' + m.about + ' ' + an.devices.map(d => d.name).join(' ')).toLowerCase();
+      if (!okF || (query && !hay.includes(query))) return;
+      n++;
+      const dots = '●'.repeat(m.level) + '○'.repeat(3 - m.level);
+      const card = el('button', { className: 'ex-card', title: title, onclick: () => { picked = i; dlg.querySelector('.df button').click(); } },
+        el('div', { className: 'ex-top' }, el('span', { className: 'ex-ico', textContent: m.icon }), el('span', { className: 'ex-lv', title: 'ความยาก', textContent: dots })),
+        el('b', { className: 'ex-t', textContent: title }),
+        m.about ? el('div', { className: 'ex-d', textContent: m.about }) : null,
+        el('div', { className: 'ex-parts' }, ...(an.devices.length ? an.devices.slice(0, 4).map(d => el('span', { className: 'pchip', textContent: d.icon + ' ' + d.short })) : [el('span', { className: 'pchip ok', textContent: '✅ ไม่ต้องต่ออะไร' })]),
+          an.devices.length > 4 ? el('span', { className: 'pchip', textContent: '+' + (an.devices.length - 4) }) : null));
+      grid.append(card);
+    });
+    count.textContent = 'พบ ' + n + ' จาก ' + EXAMPLES.length + ' ตัวอย่าง';
+    if (!n) grid.append(emptyCard('🔍', 'ไม่พบตัวอย่าง', 'ลองคำค้นอื่น หรือกดปุ่ม "ทั้งหมด"'));
+  };
+  for (const [k, t] of FILTERS) chips.append(el('button', { className: 'chip' + (k === 'all' ? ' on' : ''), textContent: t, onclick: e => {
+    filter = k; for (const c of chips.children) c.classList.toggle('on', c === e.currentTarget); render(); } }));
+  search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); render(); });
+  render();
+  dlg.classList.add('wide');
+  await dialog('📚 ตัวอย่างโปรแกรม', [search, chips, count, grid], [['ปิด', null]]);
+  dlg.classList.remove('wide');
+  if (picked !== null) loadExample(picked);
+}
+
+async function loadExample(i) {
+  if (!ws || !await okToReplace('โหลดตัวอย่าง "' + EXAMPLES[i][0] + '"')) return;
+  applyProgram({ name: '', blocks: EXAMPLES[i][1], manual: null });
+  lastExample = { title: EXAMPLES[i][0], state: EXAMPLES[i][1] };
+  addLine(2, '📘 ' + EXAMPLES[i][0]);
+  const m = metaOf(i);
+  if (m.an.devices.length) { addLine(2, '   ต้องต่ออุปกรณ์ ' + m.an.devices.length + ' อย่าง — ดูวิธีต่อสายที่แท็บ "การต่อสาย"'); setTimeout(() => { refreshWiring(); showRight('wiring'); }, 120); }
+  else { for (const n of exampleNotes(EXAMPLES[i][1])) for (const l of n.split('\n')) addLine(2, '   ' + l); setTimeout(() => { refreshWiring(); showRight('console'); }, 120); }
+}
+$('galleryBtn').onclick = openGallery;
+
+// ------------------------------------------------------------------ welcome
+async function welcome() {
+  const step = (n, t, d) => el('div', { className: 'wstep' }, el('span', { className: 'wn', textContent: String(n) }), el('div', null, el('b', { textContent: t }), el('div', { className: 'muted', textContent: d })));
+  const body = [el('p', { className: 'wlead', textContent: 'เขียนโปรแกรมควบคุมบอร์ด ESP32 ด้วยการลากบล็อก — แล้วกดรันได้ทันที ไม่ต้องคอมไพล์ ไม่ต้องแฟลชใหม่' }),
+    step(1, 'ลากบล็อก', 'เลือกหมวดสีทางซ้าย ลากบล็อกมาต่อกัน (หรือกด 🔍 ค้นหาบล็อก)'),
+    step(2, 'กด ▶ รัน', 'โปรแกรมทำงานบนบอร์ดทันที กด ■ หยุด เมื่ออยากหยุด'),
+    step(3, 'ดูผลและวิธีต่อสาย', 'คอนโซลแสดงข้อความ ส่วนแท็บ "🔌 การต่อสาย" บอกว่าอุปกรณ์แต่ละตัวต้องต่อขาไหน'),
+    el('p', { className: 'muted', textContent: 'เริ่มง่ายที่สุด: เลือกตัวอย่าง "ไฟกะพริบ" ไม่ต้องต่ออะไรเพิ่ม ไฟสีฟ้าบนบอร์ดจะกะพริบ' })];
+  const v = await dialog('👋 ยินดีต้อนรับสู่ ESP32 Live Code', body, [['ข้ามไปก่อน', null], ['📚 ดูตัวอย่างทั้งหมด', 'gallery'], ['▶ ลองไฟกะพริบ', 'try', 'primary']]);
+  store.set('lc_seen', '1');
+  if (v === 'try') { await loadExample(0); showRight('console'); setTimeout(run, 400); }
+  else if (v === 'gallery') openGallery();
+}
+
+// ------------------------------------------------------------------ block search (Ctrl+K)
+let blockIndex = null;
+function buildBlockIndex() {
+  const hw = new Blockly.Workspace(), out = [];
+  for (const c of TOOLBOX.contents) if (c.contents) for (const it of c.contents) if (it.kind === 'block') {
+    try {
+      const st = { type: it.type, inputs: it.inputs, fields: it.fields, extraState: it.extraState };
+      const b = Blockly.serialization.blocks.append(st, hw);
+      out.push({ cat: c.name, color: c.colour, st, text: b.toString().replace(/\?/g, '…'), tip: String(b.getTooltip ? b.getTooltip() : '').split('\n')[0] });
+    } catch (e) { /* block not available in the headless workspace */ }
+  }
+  hw.dispose();
+  return out;
+}
+async function openBlockSearch() {
+  if (!ws) return;
+  blockIndex = blockIndex || buildBlockIndex();
+  let picked = null, q = '';
+  const list = el('div', { className: 'bs-list' });
+  const input = el('input', { type: 'text', className: 'gal-search', placeholder: '🔍 พิมพ์ชื่อบล็อก เช่น dht, servo, delay, แก๊ส', autocomplete: 'off' });
+  const render = () => {
+    list.replaceChildren();
+    const hits = blockIndex.filter(b => !q || (b.text + ' ' + b.tip + ' ' + b.cat).toLowerCase().includes(q)).slice(0, 40);
+    for (const b of hits) list.append(el('button', { className: 'bs-row', onclick: () => { picked = b.st; dlg.querySelector('.df button').click(); } },
+      el('i', { style: 'background:' + b.color }), el('span', { className: 'bs-t', textContent: b.text }), el('small', { textContent: b.cat.replace(/^\S+\s/, '') + (b.tip ? ' · ' + trunc(b.tip, 60) : '') })));
+    if (!hits.length) list.append(el('div', { className: 'muted', textContent: 'ไม่พบบล็อก' }));
+  };
+  input.addEventListener('input', () => { q = input.value.trim().toLowerCase(); render(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { const r = list.querySelector('.bs-row'); if (r) r.click(); } });
+  render();
+  await dialog('🔍 ค้นหาบล็อก', [input, list], [['ปิด', null]]);
+  if (!picked) return;
+  await showTab('blocks');
+  Blockly.Events.setGroup(true);                         // create + move = one undo step
+  try {
+    const b = Blockly.serialization.blocks.append(picked, ws, { recordUndo: true });   // default is false: Undo would skip the creation
+    try {
+      const vm = ws.getMetricsManager().getViewMetrics(true), p = b.getRelativeToSurfaceXY();
+      b.moveBy(vm.left + vm.width / 2 - 70 - p.x, vm.top + vm.height / 3 - p.y);
+      Blockly.common.setSelected(b);
+    } catch (e) { /* position is a nicety */ }
+  } finally { Blockly.Events.setGroup(false); }
+  toast('วางบล็อกแล้ว — ลากไปต่อกับบล็อกอื่นได้เลย');
+}
+
+// ------------------------------------------------------------------ tools next to the tabs
+$('tbUndo').onclick = () => { if (ws) ws.undo(false); };
+$('tbRedo').onclick = () => { if (ws) ws.undo(true); };
+$('tbFit').onclick = () => {
+  if (!ws) return;
+  try {
+    const bb = ws.getBlocksBoundingBox(), vm = ws.getMetricsManager().getViewMetrics(false);
+    const k = Math.min(vm.width / (bb.right - bb.left + 100), vm.height / (bb.bottom - bb.top + 100), 1);
+    ws.setScale(Math.max(0.3, Math.min(1, k)));
+  } catch (e) { /* keep current zoom */ }
+  ws.scrollCenter();
+};
+$('tbSearch').onclick = openBlockSearch;
+$('tbPins').onclick = showPinout;
+ACTIONS.help = welcome;
+ACTIONS.pins = showPinout;
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); openBlockSearch(); } });
+
+refreshWiring();
+if (!store.get('lc_seen')) setTimeout(welcome, 600);
+
+// ------------------------------------------------------------------ polling
+let since = 0, vs = -1, lastClear = 0, fails = 0, lastVals = null, bootId = null;
+const statusEl = $('status');
+function setStatus(cls, text) { statusEl.className = cls; statusEl.textContent = text; }
+async function poll() {
+  try {
+    // time out: a request cut off by a reboot or WiFi drop must not stall polling forever
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 3000);
+    let j;
+    try {
+      const r = await fetch('/api/log?since=' + since + '&vs=' + vs, { cache: 'no-store', signal: ac.signal });
+      j = await r.json();
+    } finally { clearTimeout(to); }
+    fails = 0;
+    if (bootId !== null && j.boot !== bootId) {                              // board restarted
+      bootId = j.boot; since = 0; vs = -1; lastClear = 0;
+      addLine(2, '— บอร์ดเริ่มทำงานใหม่ —');
+      refreshInfo();
+      setTimeout(poll, 0);
+      return;
+    }
+    bootId = j.boot;
+    if (j.clear > lastClear) { con.textContent = ''; lastClear = j.clear; } // clear() on the board
+    for (const l of j.lines) { addLine(l.t, l.m); since = l.s; }
+    if (j.vals) lastVals = j.vals;
+    if (lastVals && (j.vals || j.running)) renderVals(lastVals);            // keep graphs moving while running
+    vs = j.vs;
+    setStatus(j.running ? 'run' : '', j.running ? 'กำลังทำงาน' : 'ว่าง');
+  } catch (e) {
+    if (++fails >= 3) setStatus('off', 'ขาดการเชื่อมต่อ');
+  }
+  setTimeout(poll, 250);
+}
+function refreshInfo() {
+  return fetch('/api/info', { cache: 'no-store' }).then(r => r.json()).then(i => {
+    boardInfo = i;
+    $('info').textContent = i.ip + ' · ' + (i.mode === 'ap' ? 'โหมด AP' : i.ssid) + ' · v' + i.ver;
+    $('auto').style.display = i.autorun ? 'inline' : 'none';
+  }).catch(() => {});
+}
+refreshInfo();
+updateManual();
+setDirty(dirty);
+poll();
+</script>
+</body>
+</html>

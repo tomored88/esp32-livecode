@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ติดตั้ง ESP32 Live Code</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --line:#d9dce1; --text:#1d2330; --muted:#6b7280; --accent:#1f7a4d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,"Noto Sans Thai","Leelawadee UI",sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:32px 16px 48px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .ver { color:var(--muted); font-size:14px; margin-bottom:24px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; }
+  ol { padding-left:22px; margin:8px 0; }
+  li { margin:6px 0; }
+  code { background:#eef0f3; padding:1px 6px; border-radius:4px; font-size:14px; }
+  .warn { background:#fef9c3; border-color:#fde68a; }
+  esp-web-install-button button[slot=activate] { font:inherit; font-size:18px; font-weight:600; padding:12px 28px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  .muted { color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ติดตั้ง ESP32 Live Code</h1>
+  <div class="ver">เฟิร์มแวร์ v1.0.0 · สำหรับ ESP32 Dev Module (ESP32-WROOM-32, แฟลช 4MB)</div>
+
+  <div class="card">
+    <ol>
+      <li>เสียบบอร์ด ESP32 เข้าคอมด้วยสาย USB (ต้องเป็นสายที่ส่งข้อมูลได้ ไม่ใช่สายชาร์จอย่างเดียว)</li>
+      <li>กดปุ่มด้านล่าง แล้วเลือกพอร์ตของบอร์ด (มักชื่อ CP210x, CH340 หรือ USB Serial)</li>
+      <li>เลือก <b>Install</b> แล้วรอจนเสร็จ (ประมาณ 1 นาที)</li>
+    </ol>
+    <p style="text-align:center; margin:20px 0 4px">
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">⚡ ติดตั้งลงบอร์ด</button>
+        <span slot="unsupported">เบราว์เซอร์นี้ติดตั้งไม่ได้ — ใช้ Chrome หรือ Edge บนคอมพิวเตอร์</span>
+        <span slot="not-allowed">ต้องเปิดหน้านี้ผ่าน https:// หรือ http://localhost</span>
+      </esp-web-install-button>
+    </p>
+  </div>
+
+  <div class="card">
+    <b>หลังติดตั้งเสร็จ</b>
+    <ol>
+      <li>ใช้มือถือหรือคอมต่อ WiFi ชื่อ <code>ESP32-LiveCode</code> รหัส <code>12345678</code></li>
+      <li>เปิดเว็บ <code>http://192.168.4.1</code> แล้วเริ่มลากบล็อกได้เลย</li>
+      <li>อยากให้บอร์ดต่อ WiFi บ้าน/ออฟฟิศ: ☰ เมนู → ตั้งค่า WiFi แล้วเปิด <code>http://esp32.local</code></li>
+    </ol>
+  </div>
+
+  <div class="card warn">
+    <b>ต่อไม่ติด?</b>
+    <ol>
+      <li>ไม่เห็นพอร์ตในรายการ: ติดตั้งไดรเวอร์ USB (CP210x หรือ CH340) แล้วเสียบใหม่</li>
+      <li>ขึ้นว่า "Failed to connect": กดปุ่ม <b>BOOT</b> บนบอร์ดค้างไว้ ตอนที่เริ่มติดตั้ง แล้วปล่อยเมื่อเริ่มเขียน</li>
+      <li>ปิดโปรแกรมอื่นที่เปิดพอร์ตนี้อยู่ (เช่น Arduino IDE, Serial Monitor)</li>
+    </ol>
+    <p class="muted">ถ้าเลือก "Erase device" โปรแกรมที่บันทึกไว้บนบอร์ดและค่า WiFi จะถูกลบ</p>
+  </div>
+</main>
+</body>
+</html>
