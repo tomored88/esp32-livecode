@@ -458,7 +458,22 @@ python tools/make_release.py
 
 ### Web API
 
-ดูตารางในข้อ 4 ของ [PLAN.md](PLAN.md)
+
+| Method | Path | รายละเอียด |
+|---|---|---|
+| GET | `/` | หน้า IDE (gzip, no-cache) |
+| GET | `/blockly.js`, `/media/*` | ไฟล์ Blockly (gzip, cache 1 วัน) |
+| POST | `/api/run` | body = โค้ด Lua (text/plain) |
+| POST | `/api/stop` | หยุดโปรแกรม |
+| GET | `/api/log?since=N&vs=M` | `{boot, seq, clear, running, lines:[{s,t,m}], vs, vals?:{k:v}}` — `boot` เปลี่ยน = บอร์ดรีสตาร์ต — t: 0=print 1=error 2=system; ส่ง `vals` เฉพาะเมื่อ vs เปลี่ยน; `clear`>since = ล้าง console ฝั่งเว็บ |
+| GET | `/api/info` | `{ver, ip, mode(sta/ap), ssid, saved, heap, autorun, fs}` — `saved` = WiFi ที่ตั้งไว้ |
+| GET | `/api/files` | รายชื่อโปรแกรมที่บันทึก |
+| GET/POST/DELETE | `/api/file?name=x&kind=lua\|blk` | อ่าน/บันทึก/ลบ (`name=__autorun` = ไฟล์ autorun) ชื่อใช้ได้ `a-z0-9_-` ≤24 ตัว · POST ต้องเป็น multipart/form-data (เขียนลงแฟลชทีละส่วน) ≤64KB; 413 = ใหญ่เกิน, 507 = พื้นที่เต็ม |
+| POST | `/api/wifi` | form `ssid`,`pass` → เก็บใน NVS (Preferences) แล้วรีบูต; `ssid` ว่าง = ลืม WiFi กลับเป็นโหมด AP |
+| GET | `/api/scan` | `[{ssid, rssi, lock}]` WiFi รอบตัว (~4 วิ) |
+| POST | `/api/reboot` | รีบูต |
+
+ที่เก็บไฟล์ (LittleFS): `/p/<name>.lua`, `/p/<name>.blk` (JSON ของ workspace), `/autorun.lua`, `/autorun.blk`
 
 ---
 
